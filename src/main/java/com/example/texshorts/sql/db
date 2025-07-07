@@ -1,0 +1,2 @@
+CREATE USER 'texshorts'@'localhost' IDENTIFIED BY 'texshortsmanager';
+GRANT ALL PRIVILEGES ON texshorts.* TO 'texshorts'@'localhost';
