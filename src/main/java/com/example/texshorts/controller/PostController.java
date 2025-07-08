@@ -4,6 +4,7 @@ import com.example.texshorts.DTO.PostResponseDTO;
 import com.example.texshorts.entity.User;
 import com.example.texshorts.repository.UserRepository;
 import com.example.texshorts.service.PostService;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -20,6 +21,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/posts")
 @RequiredArgsConstructor
+@SecurityRequirement(name = "bearerAuth")
 public class PostController {
     private final PostService postService;
     private final UserRepository userRepository;
