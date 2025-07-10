@@ -29,7 +29,7 @@ public class JwtTokenProvider {
         key = Keys.hmacShaKeyFor(secretKey.getBytes(StandardCharsets.UTF_8));
     }
 
-    // 토큰 생성
+    // 토큰 생성 (권한 "ROLE_USER")
     public String createToken(String username, List<String> roles) {
         Claims claims = Jwts.claims().setSubject(username);
         claims.put("roles", roles);
@@ -87,6 +87,7 @@ public class JwtTokenProvider {
                 .collect(Collectors.toList());
     }
 
+    //AuthRestController 응답용
     // Authentication 객체로부터 토큰 생성 (Flutter 로그인 응답용)
     public String generateToken(org.springframework.security.core.Authentication authentication) {
         String username = authentication.getName();
@@ -95,6 +96,7 @@ public class JwtTokenProvider {
                 .map(auth -> auth.getAuthority())
                 .collect(Collectors.toList());
 
+        System.out.println("유저 ROLE :" + roles);
         return createToken(username, roles);
     }
 

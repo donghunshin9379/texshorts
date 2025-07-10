@@ -1,6 +1,7 @@
 package com.example.texshorts.controller;
 
 import com.example.texshorts.DTO.PostResponseDTO;
+import com.example.texshorts.custom.CustomUserDetails;
 import com.example.texshorts.entity.User;
 import com.example.texshorts.repository.UserRepository;
 import com.example.texshorts.service.PostService;
@@ -21,7 +22,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/posts")
 @RequiredArgsConstructor
-@SecurityRequirement(name = "bearerAuth")
+@SecurityRequirement(name = "bearerAuth") //swagger 인증용
 public class PostController {
     private final PostService postService;
     private final UserRepository userRepository;
@@ -35,20 +36,18 @@ public class PostController {
             @RequestPart(value = "tags", required = false) String tags,
             @RequestPart(value = "location", required = false) String location,
             @RequestPart(value = "visibility", required = false) String visibility,
-            @AuthenticationPrincipal UserDetails userDetails,
+            @AuthenticationPrincipal CustomUserDetails customUserDetails,
             HttpServletRequest request
     ) {
-        String username = userDetails.getUsername();
         logger.info("Authorization 헤더: {}", request.getHeader("Authorization"));
 
-        // 예를 들어, UserService에서 User 엔티티 조회
-        User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new RuntimeException("사용자 없음"));
+        User user = customUserDetails.getUser();
 
         logger.info(">>> 받은 content:\n{}", content);
         postService.createPost(thumbnail, title, content, tags, location, visibility, user);
         return ResponseEntity.ok("게시물 생성 성공");
     }
+
 
     @GetMapping
     public ResponseEntity<List<PostResponseDTO>> getPagedPosts(

@@ -1,5 +1,6 @@
 package com.example.texshorts.service;
 
+import com.example.texshorts.custom.CustomUserDetails;
 import com.example.texshorts.entity.User;
 import com.example.texshorts.repository.UserRepository;
 import org.slf4j.ILoggerFactory;
@@ -30,12 +31,11 @@ public class CustomUserDetailsService implements UserDetailsService {
                 .orElseThrow(() -> new UsernameNotFoundException("해당 사용자가 존재하지 않습니다"));
         logger.info("로그인 :{}", user.getUsername());
         logger.info("계정권한 :{}", user.getRoles());
-        return new org.springframework.security.core.userdetails.User(
-                user.getUsername(),
-                user.getPassword(),
-                user.getRoles().stream()
-                        .map(SimpleGrantedAuthority::new)
-                        .collect(Collectors.toList())
-        );
+
+        // CustomUserDetails 객체 생성 후 반환
+        return new CustomUserDetails(user);
     }
+
+
+
 }
