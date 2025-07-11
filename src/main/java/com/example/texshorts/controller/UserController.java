@@ -10,7 +10,7 @@ import java.util.Collections;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api")
+@RequestMapping("/api/signup")
 public class UserController {
     private final UserRepository userRepository;
 
@@ -26,9 +26,17 @@ public class UserController {
         return Collections.singletonMap("available", available);
     }
 
+    // 닉네임 중복 체크 API
     @GetMapping("/check-nickname")
     public Map<String, Boolean> checkNickname(@RequestParam String nickname) {
         boolean available = !userRepository.existsByNickname(nickname);
+        return Collections.singletonMap("available", available);
+    }
+
+    // 이메일 중복 체크 API
+    @GetMapping("/check-email")
+    public Map<String, Boolean> checkEmail(@RequestParam String email) {
+        boolean available = !userRepository.existsByEmail(email);
         return Collections.singletonMap("available", available);
     }
 

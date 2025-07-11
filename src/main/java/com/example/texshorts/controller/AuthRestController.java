@@ -6,13 +6,16 @@ import com.example.texshorts.DTO.SignupRequest;
 import com.example.texshorts.entity.User;
 import com.example.texshorts.repository.UserRepository;
 import com.example.texshorts.security.JwtTokenProvider;
+import com.example.texshorts.service.SignUpService;
+import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -22,20 +25,16 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/auth")
+@RequiredArgsConstructor
 public class AuthRestController {
 
     private final AuthenticationManager authenticationManager;
     private final JwtTokenProvider jwtTokenProvider;
     private final UserRepository userRepository;
-    private final PasswordEncoder passwordEncoder;
+    private final SignUpService signupService;
+    private static final Logger logger = LoggerFactory.getLogger(AuthRestController.class);
 
-    public AuthRestController(AuthenticationManager authenticationManager, JwtTokenProvider jwtTokenProvider,
-                              UserRepository userRepository, PasswordEncoder passwordEncoder) {
-        this.authenticationManager = authenticationManager;
-        this.jwtTokenProvider = jwtTokenProvider;
-        this.userRepository = userRepository;
-        this.passwordEncoder = passwordEncoder;
-    }
+
 
     @PostMapping("/signup")
     public ResponseEntity<?> signup(@RequestBody SignupRequest signupRequest) {
@@ -51,15 +50,11 @@ public class AuthRestController {
             return ResponseEntity.badRequest().body("닉네임은 10자리 미만이어야 합니다.");
         }
 
-        User user = new User();
-        user.setUsername(signupRequest.getUsername());
-        user.setNickname(signupRequest.getNickname());
-        user.setPassword(passwordEncoder.encode(signupRequest.getPassword()));
-        user.setEmail(signupRequest.getEmail());
-        user.setGender(signupRequest.getGender());
-        user.setBirthDate(signupRequest.getBirthDate());
-        user.setRoles(List.of("ROLE_USER"));
+        if (userRepository.existsByEmail(signupRequest.getEmail())) {
+            return ResponseEntity.badRequest().body("이미 존재하는 이메일입니다.");
+        }
 
+        User user = signupService.createUserFromSignup(signupRequest);
         userRepository.save(user);
 
         return ResponseEntity.ok("회원가입 성공");
@@ -83,6 +78,7 @@ public class AuthRestController {
             return ResponseEntity.ok(new JwtResponse(token, roles));
 
         } catch (AuthenticationException e) {
+            logger.error("로그인 실패", e);
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("로그인 실패");
         }
     }

@@ -1,18 +1,20 @@
 package com.example.texshorts.entity;
 
 import jakarta.persistence.*;
-import lombok.Data;
+import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
 
 @Entity
 @Data
 @Table(name = "user")
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@AllArgsConstructor
+@Builder //회원가입용 빌더패턴
 public class User {
 
     //DB 고유 식별자
@@ -39,7 +41,7 @@ public class User {
     private Gender gender;
 
     @ElementCollection(fetch = FetchType.EAGER)
-    private List<String> roles = new ArrayList<>();
+    private List<String> roles;
 
     @CreationTimestamp
     private LocalDateTime createdAt;

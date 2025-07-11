@@ -7,9 +7,8 @@ import com.example.texshorts.entity.User;
 import com.example.texshorts.repository.PostReactionRepository;
 import com.example.texshorts.repository.PostRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
-
+import java.time.Duration;
 import java.util.Optional;
 
 @Service
@@ -18,72 +17,73 @@ public class PostReactionService {
 
     private final PostRepository postRepository;
     private final PostReactionRepository postReactionRepository;
-    private final RedisTemplate<String, String> redisTemplate;
+    private final RedisCacheService redisCacheService;
+
+    private String getRedisKey(Long postId, ReactionType type) {
+        return "post:" + postId + ":" + type.name().toLowerCase();
+    }
 
     public void react(Long postId, User user, ReactionType type) {
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new IllegalArgumentException("해당 게시글이 존재하지 않습니다."));
 
-        // 기존 리액션 조회
         Optional<PostReaction> existing = postReactionRepository.findByUserAndPost(user, post);
 
         if (existing.isPresent()) {
             ReactionType previousType = existing.get().getType();
 
-            // 같은 리액션이면 토글 해제 (취소)
             if (previousType == type) {
-                postReactionRepository.delete(existing.get());
-                decrementRedisCount(postId, type);
+                deleteReaction(existing.get(), postId, type);
                 return;
             }
-
-            // 다른 리액션이면 교체
-            postReactionRepository.delete(existing.get());
-            decrementRedisCount(postId, previousType);
+            deleteReaction(existing.get(), postId, previousType);
         }
+        saveNewReaction(post, user, type, postId);
+    }
 
-        // 새 리액션 저장
+    // 기존 리액션 삭제
+    private void deleteReaction(PostReaction reaction, Long postId, ReactionType type) {
+        postReactionRepository.delete(reaction);
+        redisCacheService.decrement(getRedisKey(postId, type));
+        redisCacheService.delete(getRedisKey(postId, type));
+    }
+
+    // 첫리액션 or 기존 리액션 변경
+    private void saveNewReaction(Post post, User user, ReactionType type, Long postId) {
         PostReaction newReaction = new PostReaction();
-        newReaction.setUser(user);
         newReaction.setPost(post);
+        newReaction.setUser(user);
         newReaction.setType(type);
         postReactionRepository.save(newReaction);
 
-        incrementRedisCount(postId, type);
+        redisCacheService.increment(getRedisKey(postId, type));
+        redisCacheService.delete(getRedisKey(postId, type));
     }
 
-    private void incrementRedisCount(Long postId, ReactionType type) {
-        String key = getRedisKey(postId, type);
-        redisTemplate.opsForValue().increment(key);
-    }
-
-    private void decrementRedisCount(Long postId, ReactionType type) {
-        String key = getRedisKey(postId, type);
-        redisTemplate.opsForValue().decrement(key);
-    }
-
-    private String getRedisKey(Long postId, ReactionType type) {
-        return "post:" + postId + ":" + type.name().toLowerCase();
-    }
-    
     // 좋아요 카운트 반환
     public Long getLikeCount(Long postId) {
-        return getOrLoadReactionCount(postId, ReactionType.LIKE);
-    }
+        String key = getRedisKey(postId, ReactionType.LIKE);
+        Long cachedCount = null;
 
-    // Redis 연계 repository 요청
-    private Long getOrLoadReactionCount(Long postId, ReactionType type) {
-        String key = getRedisKey(postId, type);
-        String cached = redisTemplate.opsForValue().get(key);
-
-        if (cached != null) {
-            return Long.parseLong(cached);
+        try {
+            String cached = redisCacheService.get(key);
+            if (cached != null) {
+                cachedCount = Long.parseLong(cached);
+                return cachedCount;
+            }
+        } catch (Exception e) {
+            System.err.println("Redis 캐시 조회 실패, DB에서 조회");
         }
 
-        long count = postReactionRepository.countByPostIdAndType(postId, type);
-        redisTemplate.opsForValue().set(key, String.valueOf(count));
+        long count = postReactionRepository.countByPostIdAndType(postId, ReactionType.LIKE);
+
+        try {
+            redisCacheService.set(key, String.valueOf(count), Duration.ofMinutes(10)); // TTL 10분
+        } catch (Exception e) {
+            System.err.println("Redis 캐시 저장 실패");
+        }
+
         return count;
     }
-
 
 }

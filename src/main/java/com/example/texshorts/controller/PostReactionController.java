@@ -8,7 +8,6 @@ import com.example.texshorts.service.PostReactionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
 
@@ -25,7 +24,6 @@ public class PostReactionController {
     @PostMapping("/doLike")
     public ResponseEntity<Void> like(@RequestParam Long postId,
                                      @AuthenticationPrincipal CustomUserDetails customUserDetails) {
-        // CustomUserDetails에서 User 엔티티 바로 꺼냄
         User user = customUserDetails.getUser();
 
         postReactionService.react(postId, user, ReactionType.LIKE);
