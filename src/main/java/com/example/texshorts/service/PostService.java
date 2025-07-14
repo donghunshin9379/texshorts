@@ -1,5 +1,6 @@
 package com.example.texshorts.service;
 
+import com.example.texshorts.DTO.PostCreateRequest;
 import com.example.texshorts.DTO.PostResponseDTO;
 import com.example.texshorts.entity.Post;
 import com.example.texshorts.entity.User;
@@ -12,7 +13,6 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
-
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -32,17 +32,34 @@ public class PostService {
     public PostService(PostRepository postRepository) {
         this.postRepository = postRepository;
     }
-
-    public void createPost(MultipartFile thumbnail, String title, String content,
-                           String tags, String location, String visibility, User user) {
+    
+    // 게시물 객체 생성
+    public void buildPost(MultipartFile thumbnail, PostCreateRequest dto, User user) {
         try {
             String savedFileName = saveThumbnail(thumbnail);
-            savePostData(savedFileName, title, content, tags, location, visibility, user);
+
+            Post post = Post.builder()
+                    .thumbnailPath(savedFileName)
+                    .title(dto.getTitle())
+                    .content(dto.getContent())
+                    .tags(dto.getTags())
+                    .location(dto.getLocation())
+                    .visibility(dto.getVisibility())
+                    .user(user)
+                    .createdAt(LocalDateTime.now())
+                    .build();
+
+            uploadPost(post);
         } catch (IOException e) {
             throw new RuntimeException("게시물 생성 실패", e);
         }
     }
 
+    // 게시물 객체 > DB
+    @Transactional
+    public void uploadPost(Post post) {
+        postRepository.save(post);
+    }
 
     public String saveThumbnail(MultipartFile thumbnail) throws IOException {
         String fileName = UUID.randomUUID() + "_" + thumbnail.getOriginalFilename();
@@ -54,23 +71,6 @@ public class PostService {
         Files.copy(thumbnail.getInputStream(), filePath);
         return fileName;
     }
-
-    @Transactional
-    public void savePostData(String thumbnailFileName, String title, String content,
-                             String tags, String location, String visibility, User user) {
-        Post post = new Post();
-        post.setThumbnailPath(thumbnailFileName);
-        post.setTitle(title);
-        post.setContent(content);
-        post.setTags(tags);
-        post.setLocation(location);
-        post.setVisibility(visibility);
-        post.setCreatedAt(LocalDateTime.now());
-        post.setUser(user);
-
-        postRepository.save(post);
-    }
-
 
     public List<PostResponseDTO> getPostsPaged(int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));

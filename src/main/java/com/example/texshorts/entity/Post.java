@@ -1,7 +1,7 @@
 package com.example.texshorts.entity;
 
 import jakarta.persistence.*;
-import lombok.Data;
+import lombok.*;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -9,7 +9,11 @@ import java.util.List;
 
 @Entity
 @Table(name = "posts")
-@Data
+@Getter
+@Setter //수정/임시저장 O, 불변 X.
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class Post {
 
     @Id
@@ -19,7 +23,6 @@ public class Post {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
-
 
     @Column(name = "thumbnail_path", nullable = false)
     private String thumbnailPath;
@@ -41,6 +44,7 @@ public class Post {
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
+    // 양방향 관계
     @OneToMany(mappedBy = "post", cascade = CascadeType.ALL)
     private List<PostReaction> reactions = new ArrayList<>();
 }

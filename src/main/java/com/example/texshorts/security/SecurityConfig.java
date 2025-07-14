@@ -73,10 +73,13 @@ public class SecurityConfig {
                                 "/swagger-resources/**",
                                 "/webjars/**"
                         ).permitAll()
-                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                        .requestMatchers("/api/posts/reaction/**").hasRole("USER")
-                        .requestMatchers("/api/**").authenticated()
-                        .anyRequest().authenticated()
+
+                                // 권한 필요
+                                .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                                .requestMatchers("/api/posts/reaction/**").hasRole("USER")
+
+                                // 인증 필요
+                                .requestMatchers("/api/**").authenticated()
                 )
                 .authenticationProvider(authenticationProvider())
                 .addFilterBefore(jwtAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class);

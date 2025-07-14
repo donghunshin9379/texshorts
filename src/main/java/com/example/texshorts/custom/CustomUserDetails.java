@@ -1,12 +1,14 @@
 package com.example.texshorts.custom;
 
 import com.example.texshorts.entity.User;
+import lombok.Getter;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.GrantedAuthority;
 import java.util.Collection;
 import java.util.stream.Collectors;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
+@Getter
 public class CustomUserDetails implements UserDetails {
 
     private final User user; // 실제 엔티티를 멤버 변수로 둠
