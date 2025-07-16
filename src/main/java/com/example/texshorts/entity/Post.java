@@ -47,4 +47,9 @@ public class Post {
     // 양방향 관계
     @OneToMany(mappedBy = "post", cascade = CascadeType.ALL)
     private List<PostReaction> reactions = new ArrayList<>();
+
+    @Column(name = "view_count", nullable = false)
+    private Integer viewCount = 0;
+
+
 }

@@ -52,6 +52,18 @@ public class PostController {
         return ResponseEntity.ok("게시물 생성 성공");
     }
 
+    // 조회수 증가 요청
+    @PostMapping("/increase-view")
+    public ResponseEntity<Void> increaseViewCount(
+            @RequestParam Long postId,
+            @AuthenticationPrincipal CustomUserDetails customUserDetails) {
+        User user = customUserDetails.getUser();
+        Long userId = user.getId();
+
+        postService.increaseViewCountIfNotViewed(postId, userId);
+        return ResponseEntity.ok().build();
+    }
+
 
 
 

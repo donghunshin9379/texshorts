@@ -4,7 +4,12 @@ import com.example.texshorts.DTO.PostCreateRequest;
 import com.example.texshorts.DTO.PostResponseDTO;
 import com.example.texshorts.entity.Post;
 import com.example.texshorts.entity.User;
+import com.example.texshorts.entity.ViewHistory;
 import com.example.texshorts.repository.PostRepository;
+import com.example.texshorts.repository.ViewHistoryRepository;
+import jakarta.persistence.EntityManager;
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -22,17 +27,15 @@ import java.util.List;
 import java.util.UUID;
 
 @Service
-
+@RequiredArgsConstructor
 public class PostService {
     // application.properties 에서 경로 주입
     @Value("${app.upload.dir}")
     private String uploadDir;
     private final PostRepository postRepository;
+    private final ViewHistoryRepository viewHistoryRepository;
 
-    public PostService(PostRepository postRepository) {
-        this.postRepository = postRepository;
-    }
-    
+
     // 게시물 객체 생성
     public void buildPost(MultipartFile thumbnail, PostCreateRequest dto, User user) {
         try {
@@ -72,6 +75,10 @@ public class PostService {
         return fileName;
     }
 
+    /**
+     * page : 게시물 갯수
+     * size :
+     * */
     public List<PostResponseDTO> getPostsPaged(int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         Page<Post> postPage = postRepository.findAll(pageable);
@@ -81,6 +88,19 @@ public class PostService {
                 .toList();
     }
 
+
+
+    @Transactional
+    public void increaseViewCountIfNotViewed(Long postId, Long userId) {
+        boolean alreadyViewed = viewHistoryRepository.existsByUserIdAndPostId(userId, postId);
+        if (!alreadyViewed) {
+            // 조회수 증가
+            postRepository.incrementViewCount(postId);
+
+            // 조회 기록 추가
+            viewHistoryRepository.save(new ViewHistory(userId, postId, LocalDateTime.now()));
+        }
+    }
 
 
 
