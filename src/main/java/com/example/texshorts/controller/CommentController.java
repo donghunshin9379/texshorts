@@ -3,8 +3,6 @@ package com.example.texshorts.controller;
 import com.example.texshorts.DTO.CommentResponseDTO;
 import com.example.texshorts.custom.CustomUserDetails;
 import com.example.texshorts.entity.Comment;
-import com.example.texshorts.repository.CommentRepository;
-import com.example.texshorts.repository.PostRepository;
 import com.example.texshorts.service.CommentService;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -22,8 +20,6 @@ import java.util.stream.Collectors;
 @RequestMapping("/api/comments")
 @RequiredArgsConstructor
 public class CommentController {
-    private final CommentRepository commentRepository;
-    private final PostRepository postRepository;
     private final CommentService commentService;
     private static final Logger logger = LoggerFactory.getLogger(CommentController.class);
     
@@ -47,10 +43,16 @@ public class CommentController {
                 .map(this::convertToDTOWithReplies)
                 .collect(Collectors.toList());
 
-         if (response.isEmpty()) {
-                return ResponseEntity.status(204).build();  //프론트 메시지 처리 > 204응답 > "댓글없음"
-            }
+        if (response.isEmpty()) {
+            return ResponseEntity.status(204).build();  // 댓글 없음
+        }
         return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/count")
+    public ResponseEntity<Integer> getCommentCount(@RequestParam Long postId) {
+        int count = commentService.getCommentCountCached(postId);
+        return ResponseEntity.ok(count);
     }
 
 
@@ -68,6 +70,8 @@ public class CommentController {
         }
     }
 
+
+
     // 답글 포함 DTO 변환
     private CommentResponseDTO convertToDTOWithReplies(Comment comment) {
         CommentResponseDTO dto = new CommentResponseDTO(comment);
@@ -78,5 +82,6 @@ public class CommentController {
         dto.setReplies(replies);
         return dto;
     }
+
 
 }

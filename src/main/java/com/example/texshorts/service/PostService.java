@@ -1,20 +1,19 @@
 package com.example.texshorts.service;
 
 import com.example.texshorts.DTO.PostCreateRequest;
-import com.example.texshorts.DTO.PostResponseDTO;
 import com.example.texshorts.entity.Post;
 import com.example.texshorts.entity.User;
 import com.example.texshorts.entity.ViewHistory;
+import com.example.texshorts.repository.CommentRepository;
 import com.example.texshorts.repository.PostRepository;
+import com.example.texshorts.repository.UserRepository;
 import com.example.texshorts.repository.ViewHistoryRepository;
-import jakarta.persistence.EntityManager;
+import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -23,8 +22,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
@@ -34,34 +32,47 @@ public class PostService {
     private String uploadDir;
     private final PostRepository postRepository;
     private final ViewHistoryRepository viewHistoryRepository;
-
+    private final UserRepository userRepository;
+    private final TagHubService tagHubService;
+    private final TagParserUtils tagParserUtils;
+    private static final Logger logger = LoggerFactory.getLogger(PostService.class);
+    private final PostDeletionRequestService postDeletionRequestService;
 
     // 게시물 객체 생성
-    public void buildPost(MultipartFile thumbnail, PostCreateRequest dto, User user) {
+    @Transactional
+    public void buildPost(MultipartFile thumbnail, PostCreateRequest dto, Long userId) {
         try {
             String savedFileName = saveThumbnail(thumbnail);
+            // TagHub용
+            List<String> tagList = tagParserUtils.parseTagsToList(dto.getTags());
 
+            // Post용
+            String tagsWithHash = tagParserUtils.formatTagsWithHash(tagList);
+
+            // 사용자 엔티티 프록시
+            User user = userRepository.getReferenceById(userId);
+
+            //posts 테이블 객체
             Post post = Post.builder()
                     .thumbnailPath(savedFileName)
                     .title(dto.getTitle())
                     .content(dto.getContent())
-                    .tags(dto.getTags())
                     .location(dto.getLocation())
                     .visibility(dto.getVisibility())
                     .user(user)
                     .createdAt(LocalDateTime.now())
+                    .viewCount(0)
+                    .tags(tagsWithHash)
                     .build();
 
-            uploadPost(post);
+            // tag_hub 테이블 저장
+            tagHubService.registerOrUpdateTagUsage(tagList);
+            //posts 테이블 저장
+            postRepository.save(post);
+
         } catch (IOException e) {
             throw new RuntimeException("게시물 생성 실패", e);
         }
-    }
-
-    // 게시물 객체 > DB
-    @Transactional
-    public void uploadPost(Post post) {
-        postRepository.save(post);
     }
 
     public String saveThumbnail(MultipartFile thumbnail) throws IOException {
@@ -76,20 +87,20 @@ public class PostService {
     }
 
     /**
-     * page : 게시물 갯수
-     * size :
+     * 게시물 리스트 페이징 (세로 스와이프)
+     * page : 몇번쨰 게시물 페이지
+     * size : 가져올 게시물 수량
      * */
-    public List<PostResponseDTO> getPostsPaged(int page, int size) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
-        Page<Post> postPage = postRepository.findAll(pageable);
+//    public List<PostResponseDTO> getPostsPaged(int page, int size) {
+//        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+//        Page<Post> postPage = postRepository.findAll(pageable);
+//
+//        return postPage.getContent().stream()
+//                .map(PostResponseDTO::new)
+//                .toList();
+//    }
 
-        return postPage.getContent().stream()
-                .map(PostResponseDTO::new)
-                .toList();
-    }
-
-
-
+    // 게시물 조회수 증가( 첫 시청filter)
     @Transactional
     public void increaseViewCountIfNotViewed(Long postId, Long userId) {
         boolean alreadyViewed = viewHistoryRepository.existsByUserIdAndPostId(userId, postId);
@@ -98,10 +109,37 @@ public class PostService {
             postRepository.incrementViewCount(postId);
 
             // 조회 기록 추가
-            viewHistoryRepository.save(new ViewHistory(userId, postId, LocalDateTime.now()));
+            Post post = postRepository.findById(postId)
+                    .orElseThrow(() -> new IllegalArgumentException("해당 게시물이 없습니다. id=" + postId));
+
+            viewHistoryRepository.save(new ViewHistory(userId, post, LocalDateTime.now()));
         }
+    }
+
+    // 게시물 객체 삭제 (유저확인)
+    @Transactional
+    public void requestDeletePost(Long postId, Long userId) {
+        Post post = postRepository.findById(postId)
+                .orElseThrow(() -> new EntityNotFoundException("게시물이 없습니다."));
+
+        if (!post.getUser().getId().equals(userId)) {
+            throw new AccessDeniedException("본인의 게시물이 아닙니다.");
+        }
+
+        post.setDeleted(true); //soft 삭제
+        postRepository.save(post);
+
+        postDeletionRequestService.enqueuePostForDeletion(postId); // Redis에 등록
     }
 
 
 
+
+
+
+
+
+
 }
+
+

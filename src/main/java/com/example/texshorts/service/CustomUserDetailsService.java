@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class CustomUserDetailsService implements UserDetailsService {
+    //실제 User 엔티티 조회
 
     private final UserRepository userRepository;
     private static final Logger logger = LoggerFactory.getLogger(CustomUserDetailsService.class);
@@ -23,7 +24,7 @@ public class CustomUserDetailsService implements UserDetailsService {
 
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        User user = userRepository.findByUsername(username)
+        User user = userRepository.findByUsername(username) //로그인 아이디.
                 .orElseThrow(() -> new UsernameNotFoundException("사용자가 존재하지 않습니다"));
         logger.info("로그인 :{}", user.getUsername());
         logger.info("계정권한 :{}", user.getRoles());

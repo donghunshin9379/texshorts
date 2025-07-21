@@ -9,15 +9,16 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
+
 @Data
-public class PostResponseDTO { //포스트(게시물) 객체
+public class PostResponseDTO {
     private final String nickname;
     private final String title;
     private final String content;
     private final String thumbnailPath;
     private final LocalDateTime createdAt;
     private final List<String> contentLines;
-    private final List<String> tags;
+    private final String tags;
 
     public PostResponseDTO(Post post) {
         this.nickname = post.getUser().getNickname(); // User 닉네임
@@ -26,7 +27,7 @@ public class PostResponseDTO { //포스트(게시물) 객체
         this.thumbnailPath = post.getThumbnailPath();
         this.createdAt = post.getCreatedAt();
         this.contentLines = contentToLines(post.getContent());
-        this.tags = parseTags(post.getTags());
+        this.tags = post.getTags();
     }
 
     private List<String> contentToLines(String content) {
@@ -68,17 +69,6 @@ public class PostResponseDTO { //포스트(게시물) 객체
     }
 
 
-    //태그 문자열을 쉼표(,) 기준으로 파싱
-    //@param tagsStr "tag1, tag2, tag3" 형식의 태그 문자열
-    private List<String> parseTags(String tagsStr) {
-        if (tagsStr == null || tagsStr.isEmpty()) {
-            return List.of();
-        }
-        //@return 태그 리스트 (null일 경우 빈 리스트 반환)
-        return Arrays.stream(tagsStr.split(","))
-                .map(String::trim)
-                .filter(s -> !s.isEmpty())
-                .collect(Collectors.toList());
-    }
+
 
 }

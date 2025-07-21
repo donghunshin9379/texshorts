@@ -3,8 +3,12 @@ package com.example.texshorts.security;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
 import jakarta.annotation.PostConstruct;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
@@ -14,25 +18,30 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 @Component
+@RequiredArgsConstructor
 public class JwtTokenProvider {
 
     private Key key;
     private final long validityInMilliseconds = 3600000; // 1시간
+    private final UserDetailsService userDetailsService;
 
     @Value("${jwt.secret}")
     private String secretKey;
 
-
-    // secretKey를 Key 객체로 초기화
     @PostConstruct
     public void init() {
         key = Keys.hmacShaKeyFor(secretKey.getBytes(StandardCharsets.UTF_8));
     }
 
-    // 토큰 생성 (권한 "ROLE_USER")
+    // 토큰 생성 시에도 접두사 붙이기
     public String createToken(String username, List<String> roles) {
         Claims claims = Jwts.claims().setSubject(username);
-        claims.put("roles", roles);
+
+        List<String> authorities = roles.stream()
+                .map(role -> role.startsWith("ROLE_") ? role : "ROLE_" + role)
+                .collect(Collectors.toList());
+
+        claims.put("roles", authorities);
 
         Date now = new Date();
         Date validity = new Date(now.getTime() + validityInMilliseconds);
@@ -41,11 +50,10 @@ public class JwtTokenProvider {
                 .setClaims(claims)
                 .setIssuedAt(now)
                 .setExpiration(validity)
-                .signWith(key, SignatureAlgorithm.HS256) // Key 객체 사용
+                .signWith(key, SignatureAlgorithm.HS256)
                 .compact();
     }
 
-    // 토큰에서 사용자 이름 추출
     public String getUsername(String token) {
         return Jwts.parserBuilder()
                 .setSigningKey(key)
@@ -55,18 +63,11 @@ public class JwtTokenProvider {
                 .getSubject();
     }
 
-    // 토큰에서 권한 리스트 추출
-    @SuppressWarnings("unchecked")
-    public List<String> getRoles(String token) {
-        return (List<String>) Jwts.parserBuilder()
-                .setSigningKey(key)
-                .build()
-                .parseClaimsJws(token)
-                .getBody()
-                .get("roles");
+    public Authentication getAuthentication(String token) {
+        UserDetails userDetails = userDetailsService.loadUserByUsername(getUsername(token));
+        return new UsernamePasswordAuthenticationToken(userDetails, "", userDetails.getAuthorities());
     }
 
-    // 토큰 유효성 검사
     public boolean validateToken(String token) {
         try {
             Jws<Claims> claims = Jwts.parserBuilder()
@@ -80,24 +81,13 @@ public class JwtTokenProvider {
         }
     }
 
-    // 권한 리스트를 GrantedAuthority 리스트로 변환
-    public List<SimpleGrantedAuthority> createAuthorities(List<String> roles) {
-        return roles.stream()
-                .map(SimpleGrantedAuthority::new)
-                .collect(Collectors.toList());
-    }
-
-    //AuthRestController 응답용
-    // Authentication 객체로부터 토큰 생성 (Flutter 로그인 응답용)
-    public String generateToken(org.springframework.security.core.Authentication authentication) {
+    public String generateToken(Authentication authentication) {
         String username = authentication.getName();
 
         List<String> roles = authentication.getAuthorities().stream()
                 .map(auth -> auth.getAuthority())
                 .collect(Collectors.toList());
 
-        System.out.println("유저 ROLE :" + roles);
         return createToken(username, roles);
     }
-
 }

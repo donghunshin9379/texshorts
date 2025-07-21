@@ -74,11 +74,10 @@ public class SecurityConfig {
                                 "/webjars/**"
                         ).permitAll()
 
-                                // 권한 필요
+                                // ROLE권한 필요
                                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                                .requestMatchers("/api/posts/reaction/**").hasRole("USER")
 
-                                // 인증 필요
+                                // 토큰 인증 필요
                                 .requestMatchers("/api/**").authenticated()
                 )
                 .authenticationProvider(authenticationProvider())
@@ -91,6 +90,7 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
+        configuration.addAllowedOrigin("http://localhost:8080");
         configuration.addAllowedOrigin("http://localhost:61330");
         configuration.setAllowedMethods(List.of("*"));
         configuration.setAllowedHeaders(List.of("*"));

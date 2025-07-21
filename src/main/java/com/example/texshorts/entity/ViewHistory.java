@@ -22,17 +22,21 @@ public class ViewHistory {
 
     private Long userId;
 
-    private Long postId;
+    // 삭제된 post 염두 nullable = true
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "post_id", nullable = true)
+    private Post post;
 
     private LocalDateTime viewedAt;
 
 
     // 편의 생성자
-    public ViewHistory(Long userId, Long postId, LocalDateTime viewedAt) {
+    public ViewHistory(Long userId, Post post, LocalDateTime viewedAt) {
         this.userId = userId;
-        this.postId = postId;
+        this.post = post;
         this.viewedAt = viewedAt;
     }
+
 
 }
 

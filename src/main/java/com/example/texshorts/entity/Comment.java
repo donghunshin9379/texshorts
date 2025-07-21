@@ -17,7 +17,9 @@ public class Comment {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "post_id")
     private Post post;
+
 
     @ManyToOne(fetch = FetchType.LAZY)
     private User user;

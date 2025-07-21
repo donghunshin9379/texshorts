@@ -4,8 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 @Entity
 @Table(name = "posts")
@@ -23,6 +22,12 @@ public class Post {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
+    
+    // Post엔티티 -> UserId 추출
+    @Transient
+    public Long getUserId() {
+        return user != null ? user.getId() : null;
+    }
 
     @Column(name = "thumbnail_path", nullable = false)
     private String thumbnailPath;
@@ -33,8 +38,6 @@ public class Post {
     @Lob
     @Column(name = "content", columnDefinition = "MEDIUMTEXT")
     private String content;
-
-    private String tags;
 
     private String location;
 
@@ -51,5 +54,14 @@ public class Post {
     @Column(name = "view_count", nullable = false)
     private Integer viewCount = 0;
 
+    // 단순 텍스트 저장(보여지는 태그)
+    @Column(name = "tags")
+    private String tags;
 
+    // 댓글 갯수
+    @Column(name = "comment_count", nullable = false)
+    private int commentCount = 0;
+
+    @Column(name = "deleted", nullable = false)
+    private boolean deleted = false;
 }
