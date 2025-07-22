@@ -2,6 +2,7 @@ package com.example.texshorts.entity;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.ToString;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -18,24 +19,29 @@ public class Comment {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "post_id")
+    @ToString.Exclude
     private Post post;
 
 
     @ManyToOne(fetch = FetchType.LAZY)
+    @ToString.Exclude
     private User user;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "parent_id")
+    @ToString.Exclude
     private Comment parent; //답글의 부모(댓글)
 
-    @OneToMany(mappedBy = "parent", cascade = CascadeType.ALL)
+    // 답글 리스트 (자식 댓글들)
+    @OneToMany(mappedBy = "parent", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @ToString.Exclude
     private List<Comment> replies = new ArrayList<>();
 
     private String content;
 
     private Boolean isDeleted = false;
 
-    private Integer likeCount = 0; //단순 댓글 좋아요 수치만 필요
+    private Integer likeCount = 0;
 
     private Integer replyCount = 0;
 

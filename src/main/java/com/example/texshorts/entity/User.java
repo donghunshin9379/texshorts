@@ -9,10 +9,12 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
+@Getter
+@Setter
+@NoArgsConstructor
+@ToString(onlyExplicitlyIncluded = true)
 @Entity
-@Data
 @Table(name = "user")
-@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 @Builder //회원가입용 빌더패턴
 public class User {

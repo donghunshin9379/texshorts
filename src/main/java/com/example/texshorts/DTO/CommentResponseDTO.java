@@ -2,20 +2,19 @@ package com.example.texshorts.DTO;
 
 import com.example.texshorts.entity.Comment;
 import lombok.Data;
+import lombok.ToString;
 
 import java.time.LocalDateTime;
 import java.util.List;
 
 @Data
+@ToString
 public class CommentResponseDTO {
 
     private Long id;
-
     private Long userId;
     private String nickname;
-
     private String content;
-
     private Integer likeCount;
     private Integer replyCount;
 
@@ -39,6 +38,15 @@ public class CommentResponseDTO {
     public void setReplies(List<CommentResponseDTO> replies) {
         this.replies = replies;
     }
+
+    public static CommentResponseDTO from(Comment comment, int replyCount) {
+        CommentResponseDTO dto = new CommentResponseDTO(comment);
+        dto.setReplyCount(replyCount);
+        dto.setReplies(List.of()); // 대댓글은 별도 API
+        return dto;
+    }
+
+
 
 }
 

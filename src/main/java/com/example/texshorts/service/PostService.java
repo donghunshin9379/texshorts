@@ -4,7 +4,6 @@ import com.example.texshorts.DTO.PostCreateRequest;
 import com.example.texshorts.entity.Post;
 import com.example.texshorts.entity.User;
 import com.example.texshorts.entity.ViewHistory;
-import com.example.texshorts.repository.CommentRepository;
 import com.example.texshorts.repository.PostRepository;
 import com.example.texshorts.repository.UserRepository;
 import com.example.texshorts.repository.ViewHistoryRepository;
@@ -36,7 +35,7 @@ public class PostService {
     private final TagHubService tagHubService;
     private final TagParserUtils tagParserUtils;
     private static final Logger logger = LoggerFactory.getLogger(PostService.class);
-    private final PostDeletionRequestService postDeletionRequestService;
+    private final PostDeletionQueueService postDeletionQueueService;
 
     // 게시물 객체 생성
     @Transactional
@@ -129,7 +128,7 @@ public class PostService {
         post.setDeleted(true); //soft 삭제
         postRepository.save(post);
 
-        postDeletionRequestService.enqueuePostForDeletion(postId); // Redis에 등록
+        postDeletionQueueService.enqueuePostForDeletion(postId); // Redis에 등록
     }
 
 

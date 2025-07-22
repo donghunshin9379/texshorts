@@ -13,7 +13,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.stream.Collectors;
+import java.util.Map;
 
 
 @RestController
@@ -22,36 +22,67 @@ import java.util.stream.Collectors;
 public class CommentController {
     private final CommentService commentService;
     private static final Logger logger = LoggerFactory.getLogger(CommentController.class);
-    
-    // 댓글 생성
+
+    // 댓글 생성 (루트)
     @PostMapping("/create")
-    public ResponseEntity<Void> createComment(
+    public ResponseEntity<Void> createRootComment(
             @RequestParam Long postId,
-            @RequestParam(required = false) Long parentId,
             @RequestBody String content,
             @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
-        commentService.createComment(postId, parentId, userDetails.getUser(), content);
+        commentService.createRootComment(postId, userDetails.getUser(), content);
         return ResponseEntity.ok().build();
     }
 
+    // 답글(대댓글) 생성
+    @PostMapping("/reply")
+    public ResponseEntity<?> createReplyComment(
+            @RequestParam Long parentCommentId,
+            @RequestBody String content,
+            @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        try {
+            Comment comment = commentService.createReply(parentCommentId, userDetails.getUser(), content);
+            return ResponseEntity.ok().build();
+        } catch (IllegalArgumentException e) {
+            // 임시 예외처리
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
     // 게시글의 댓글 목록 조회
-    @GetMapping("/get")
-    public ResponseEntity<List<CommentResponseDTO>> getComments(@RequestParam Long postId) {
-        List<Comment> comments = commentService.getComments(postId);
-        List<CommentResponseDTO> response = comments.stream()
-                .map(this::convertToDTOWithReplies)
-                .collect(Collectors.toList());
+    @GetMapping("/get/root")
+    public ResponseEntity<List<CommentResponseDTO>> getRootComments(@RequestParam Long postId) {
+        List<CommentResponseDTO> response = commentService.getRootComments(postId);
 
         if (response.isEmpty()) {
-            return ResponseEntity.status(204).build();  // 댓글 없음
+            return ResponseEntity.status(204).build();
         }
         return ResponseEntity.ok(response);
     }
 
-    @GetMapping("/count")
+    // 게시글 댓글의 답글(대댓글) 목록 조회
+    @GetMapping("/get/replies")
+    public ResponseEntity<List<CommentResponseDTO>> getReplyComments(@RequestParam Long commentId) {
+        List<CommentResponseDTO> response = commentService.getReplies(commentId);
+
+        if (response.isEmpty()) {
+            return ResponseEntity.status(204).build();
+        }
+        return ResponseEntity.ok(response);
+    }
+
+    // 댓글 갯수
+    @GetMapping("/count/root")
     public ResponseEntity<Integer> getCommentCount(@RequestParam Long postId) {
         int count = commentService.getCommentCountCached(postId);
+        return ResponseEntity.ok(count);
+    }
+    
+    // 답글 갯수
+    @GetMapping("/count/replies")
+    public ResponseEntity<Integer> getReplyCountCached(@RequestParam Long postId) {
+        int count = commentService.getReplyCountCached(postId);
         return ResponseEntity.ok(count);
     }
 
@@ -69,19 +100,5 @@ public class CommentController {
             return ResponseEntity.status(403).body(e.getMessage());
         }
     }
-
-
-
-    // 답글 포함 DTO 변환
-    private CommentResponseDTO convertToDTOWithReplies(Comment comment) {
-        CommentResponseDTO dto = new CommentResponseDTO(comment);
-        List<CommentResponseDTO> replies = comment.getReplies().stream()
-                .filter(reply -> !reply.getIsDeleted()) //삭제된 답글 제외
-                .map(CommentResponseDTO::new)
-                .collect(Collectors.toList());
-        dto.setReplies(replies);
-        return dto;
-    }
-
 
 }
