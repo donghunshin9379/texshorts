@@ -1,5 +1,6 @@
 package com.example.texshorts.repository;
 
+import com.example.texshorts.dto.CommentResponseDTO;
 import com.example.texshorts.entity.Comment;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -15,7 +16,6 @@ public interface CommentRepository extends JpaRepository<Comment, Long> {
     List<Comment> findByPostIdAndParentIsNullAndIsDeletedFalse(Long postId);
     // 댓글 답글 조회
     List<Comment> findByParentId(Long parentId);
-
 
     // 루트 댓글 수 조회
     int countByPostIdAndParentIsNullAndIsDeletedFalse(Long postId);
@@ -34,6 +34,23 @@ public interface CommentRepository extends JpaRepository<Comment, Long> {
         return findTopNByPostId(postId, PageRequest.of(0, n));
     }
 
+    /**
+     * JPQL 기반 DTO 생성쿼리 */
+    @Query("SELECT new com.example.texshorts.dto.CommentResponseDTO(" +
+            "c.id, u.id, u.nickname, " +
+            "CASE WHEN c.isDeleted = true THEN null ELSE c.content END, " +
+            "c.likeCount, c.replyCount, c.createdAt, c.isDeleted, null) " +
+            "FROM Comment c JOIN c.user u " +
+            "WHERE c.post.id = :postId AND c.parent IS NULL AND c.isDeleted = false")
+    List<CommentResponseDTO> findRootCommentDTOs(@Param("postId") Long postId);
+
+    @Query("SELECT new com.example.texshorts.dto.CommentResponseDTO(" +
+            "c.id, u.id, u.nickname, " +
+            "CASE WHEN c.isDeleted = true THEN null ELSE c.content END, " +
+            "c.likeCount, c.replyCount, c.createdAt, c.isDeleted, null) " +
+            "FROM Comment c JOIN c.user u " +
+            "WHERE c.parent.id = :parentCommentId")
+    List<CommentResponseDTO> findReplyDTOs(@Param("parentCommentId") Long parentCommentId);
 
 
 

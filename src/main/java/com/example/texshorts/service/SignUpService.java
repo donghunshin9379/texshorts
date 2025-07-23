@@ -1,6 +1,6 @@
 package com.example.texshorts.service;
 
-import com.example.texshorts.DTO.SignupRequest;
+import com.example.texshorts.dto.SignupRequest;
 import com.example.texshorts.entity.User;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;

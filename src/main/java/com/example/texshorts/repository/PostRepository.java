@@ -28,6 +28,11 @@ public interface PostRepository extends JpaRepository<Post, Long> {
 
     // 특정 유저가 구독한 유저(작성자) 게시물 select
 
+    @Modifying
+    @Query("UPDATE Post p SET p.commentCount = :count WHERE p.id = :postId")
+    void updateCommentCount(@Param("postId") Long postId, @Param("count") int count);
+
+
 
 
 

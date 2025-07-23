@@ -23,11 +23,11 @@ public class Post {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
     
-    // Post엔티티 -> UserId 추출
-    @Transient
-    public Long getUserId() {
-        return user != null ? user.getId() : null;
-    }
+//    // Post엔티티 -> UserId 추출
+//    @Transient
+//    public Long getUserId() {
+//        return user != null ? user.getId() : null;
+//    }
 
     @Column(name = "thumbnail_path", nullable = false)
     private String thumbnailPath;

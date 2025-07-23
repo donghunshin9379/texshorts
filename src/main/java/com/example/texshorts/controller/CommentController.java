@@ -1,6 +1,6 @@
 package com.example.texshorts.controller;
 
-import com.example.texshorts.DTO.CommentResponseDTO;
+import com.example.texshorts.dto.CommentResponseDTO;
 import com.example.texshorts.custom.CustomUserDetails;
 import com.example.texshorts.entity.Comment;
 import com.example.texshorts.service.CommentService;
@@ -63,8 +63,8 @@ public class CommentController {
 
     // 게시글 댓글의 답글(대댓글) 목록 조회
     @GetMapping("/get/replies")
-    public ResponseEntity<List<CommentResponseDTO>> getReplyComments(@RequestParam Long commentId) {
-        List<CommentResponseDTO> response = commentService.getReplies(commentId);
+    public ResponseEntity<List<CommentResponseDTO>> getReplyComments(@RequestParam Long parentCommentId) {
+        List<CommentResponseDTO> response = commentService.getReplies(parentCommentId);
 
         if (response.isEmpty()) {
             return ResponseEntity.status(204).build();
@@ -81,11 +81,10 @@ public class CommentController {
     
     // 답글 갯수
     @GetMapping("/count/replies")
-    public ResponseEntity<Integer> getReplyCountCached(@RequestParam Long postId) {
-        int count = commentService.getReplyCountCached(postId);
+    public ResponseEntity<Integer> getReplyCountCached(@RequestParam Long parentCommentId) {
+        int count = commentService.getReplyCountCached(parentCommentId);
         return ResponseEntity.ok(count);
     }
-
 
     // 댓글 삭제
     @DeleteMapping("/delete")
@@ -94,7 +93,7 @@ public class CommentController {
             @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
         try {
-            commentService.deleteComment(id, userDetails.getUser());
+            commentService.deleteComment(id, userDetails.getUserId());
             return ResponseEntity.ok().build();
         } catch (AccessDeniedException e) {
             return ResponseEntity.status(403).body(e.getMessage());

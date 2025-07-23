@@ -1,7 +1,9 @@
 package com.example.texshorts.controller;
 
-import com.example.texshorts.DTO.PostCreateRequest;
+import com.example.texshorts.dto.PostCreateRequest;
 import com.example.texshorts.custom.CustomUserDetails;
+import com.example.texshorts.dto.PostResponseDTO;
+import com.example.texshorts.service.PostFeedService;
 import com.example.texshorts.service.PostService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -15,22 +17,25 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/posts")
 @RequiredArgsConstructor
 @SecurityRequirement(name = "bearerAuth") //swagger 인증용
 public class PostController {
     private final PostService postService;
+    private final PostFeedService postFeedService;
+
     private static final Logger logger = LoggerFactory.getLogger(PostController.class);
 
-//    @GetMapping
-//    public ResponseEntity<List<PostResponseDTO>> getPagedPosts(
-//            @RequestParam(defaultValue = "0") int page,
-//            @RequestParam(defaultValue = "10") int size
-//    ) {
-//        List<PostResponseDTO> posts = postService.getPostsPaged(page, size);
-//        return ResponseEntity.ok(posts);
-//    }
+    @GetMapping("/posts")
+    public ResponseEntity<List<PostResponseDTO>> getPostsPaged(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size
+    ) {
+        return ResponseEntity.ok(postFeedService.getPostsPagedWithCache(page, size));
+    }
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> createPost(
@@ -42,7 +47,7 @@ public class PostController {
         PostCreateRequest dto = mapper.readValue(dataJson, PostCreateRequest.class);
 
         // userId만 전달
-        postService.buildPost(thumbnail, dto, customUserDetails.getUserId());
+        postService.requestCreatePost(thumbnail, dto, customUserDetails.getUserId());
         return ResponseEntity.ok("게시물 생성 성공");
     }
 
@@ -63,7 +68,7 @@ public class PostController {
             @AuthenticationPrincipal CustomUserDetails customUserDetails) {
         Long userId = customUserDetails.getUser().getId();
 
-        postService.increaseViewCountIfNotViewed(postId, userId);
+        postFeedService.increaseViewCountIfNotViewed(postId, userId);
         return ResponseEntity.ok().build();
     }
 

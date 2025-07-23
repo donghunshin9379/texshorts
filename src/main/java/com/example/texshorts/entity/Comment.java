@@ -22,7 +22,6 @@ public class Comment {
     @ToString.Exclude
     private Post post;
 
-
     @ManyToOne(fetch = FetchType.LAZY)
     @ToString.Exclude
     private User user;
@@ -41,30 +40,37 @@ public class Comment {
 
     private Boolean isDeleted = false;
 
-    private Integer likeCount = 0;
+    @OneToMany(mappedBy = "comment", cascade = CascadeType.ALL) /** 댓글 삭제하면 리액션도 cascade */
+    private List<CommentReaction> commentReactions = new ArrayList<>();
 
-    private Integer replyCount = 0;
+    private int likeCount = 0;
+
+    private int dislikeCount = 0;
+
+    private int replyCount = 0;
 
     private LocalDateTime createdAt = LocalDateTime.now();
 
     private LocalDateTime updatedAt = LocalDateTime.now();
 
-    public static Comment createComment(Post post, User user, String content) {
+    public static Comment createRootComment(Post post, User user, String content) {
         Comment comment = new Comment();
         comment.setPost(post);
         comment.setUser(user);
         comment.setContent(content);
         comment.setIsDeleted(false);
-        comment.setLikeCount(0);
         comment.setReplyCount(0);
+        comment.setLikeCount(0);
+        comment.setDislikeCount(0);
         comment.setCreatedAt(LocalDateTime.now());
         comment.setUpdatedAt(LocalDateTime.now());
         return comment;
     }
 
     public static Comment createReply(Comment parent, User user, String content) {
-        Comment reply = createComment(parent.getPost(), user, content);
+        Comment reply = createRootComment(parent.getPost(), user, content);
         reply.setParent(parent);
+        parent.getReplies().add(reply);  // 부모 지정
         parent.setReplyCount(parent.getReplyCount() + 1);
         return reply;
     }

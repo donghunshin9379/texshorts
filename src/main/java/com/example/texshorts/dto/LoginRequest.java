@@ -1,4 +1,4 @@
-package com.example.texshorts.DTO;
+package com.example.texshorts.dto;
 
 import lombok.Data;
 

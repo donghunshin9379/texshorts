@@ -1,4 +1,4 @@
-package com.example.texshorts.DTO;
+package com.example.texshorts.dto;
 
 import com.example.texshorts.entity.Gender;
 import lombok.Data;

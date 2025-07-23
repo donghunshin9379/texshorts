@@ -1,8 +1,8 @@
 package com.example.texshorts.controller;
 
-import com.example.texshorts.DTO.JwtResponse;
-import com.example.texshorts.DTO.LoginRequest;
-import com.example.texshorts.DTO.SignupRequest;
+import com.example.texshorts.dto.JwtResponse;
+import com.example.texshorts.dto.LoginRequest;
+import com.example.texshorts.dto.SignupRequest;
 import com.example.texshorts.entity.User;
 import com.example.texshorts.repository.UserRepository;
 import com.example.texshorts.security.JwtTokenProvider;
