@@ -1,5 +1,6 @@
 package com.example.texshorts.security;
 
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -29,6 +30,10 @@ public class RedisConfig {
         // LocalDateTime 직렬화시 Timestamp 형태 안쓰고 ISO 포맷으로 저장
         mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
+        // 타입 정보 포함 직렬화
+        mapper.activateDefaultTyping(mapper.getPolymorphicTypeValidator(),
+                ObjectMapper.DefaultTyping.NON_FINAL, JsonTypeInfo.As.PROPERTY);
+        
         // 직렬화 설정
         GenericJackson2JsonRedisSerializer serializer = new GenericJackson2JsonRedisSerializer(mapper);
 

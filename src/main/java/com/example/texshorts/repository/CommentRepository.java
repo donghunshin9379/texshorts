@@ -12,11 +12,6 @@ import java.util.List;
 
 public interface CommentRepository extends JpaRepository<Comment, Long> {
 
-    // 루트 댓글 조회
-    List<Comment> findByPostIdAndParentIsNullAndIsDeletedFalse(Long postId);
-    // 댓글 답글 조회
-    List<Comment> findByParentId(Long parentId);
-
     // 루트 댓글 수 조회
     int countByPostIdAndParentIsNullAndIsDeletedFalse(Long postId);
 
@@ -35,7 +30,7 @@ public interface CommentRepository extends JpaRepository<Comment, Long> {
     }
 
     /**
-     * JPQL 기반 DTO 생성쿼리 */
+     * JPQL 기반 DTO생성 쿼리 */
     @Query("SELECT new com.example.texshorts.dto.CommentResponseDTO(" +
             "c.id, u.id, u.nickname, " +
             "CASE WHEN c.isDeleted = true THEN null ELSE c.content END, " +

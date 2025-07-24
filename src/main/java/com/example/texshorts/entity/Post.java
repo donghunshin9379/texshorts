@@ -29,6 +29,9 @@ public class Post {
 //        return user != null ? user.getId() : null;
 //    }
 
+    @Column(name = "view_count", nullable = false)
+    private int viewCount = 0;
+
     @Column(name = "thumbnail_path", nullable = false)
     private String thumbnailPath;
 
@@ -51,8 +54,6 @@ public class Post {
     @OneToMany(mappedBy = "post", cascade = CascadeType.ALL)
     private List<PostReaction> reactions = new ArrayList<>();
 
-    @Column(name = "view_count", nullable = false)
-    private Integer viewCount = 0;
 
     // 단순 텍스트 저장(보여지는 태그)
     @Column(name = "tags")

@@ -5,6 +5,7 @@ import com.example.texshorts.custom.CustomUserDetails;
 import com.example.texshorts.dto.PostResponseDTO;
 import com.example.texshorts.service.PostFeedService;
 import com.example.texshorts.service.PostService;
+import com.example.texshorts.service.ViewService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -61,26 +62,12 @@ public class PostController {
         return ResponseEntity.ok("게시물이 삭제되었습니다.");
     }
 
-    // 조회수 증가 요청
-    @PostMapping("/increase-view")
-    public ResponseEntity<Void> increaseViewCount(
-            @RequestParam Long postId,
-            @AuthenticationPrincipal CustomUserDetails customUserDetails) {
-        Long userId = customUserDetails.getUser().getId();
 
-        postFeedService.increaseViewCountIfNotViewed(postId, userId);
-        return ResponseEntity.ok().build();
-    }
 
     // 홈탭 게시물 피드
 //    @GetMapping("/feed/home")
-//    public ResponseEntity<List<PostResponseDTO>> getHomeFeed(@AuthenticationPrincipal CustomUserDetails customUserDetails,
-//                                            @RequestParam (defaultValue = "0") int page,
-//                                            @RequestParam (defaultValue = "0") int size) {
+//    public ResponseEntity<List<PostResponseDTO>> getHomeFeed()
 //
-//        Long userId = customUserDetails.getUserId();
-//        List<PostResponseDTO> feed = feedService.generateHomeFeed(userId, page, size);
-//        return ResponseEntity.ok(feed);
 //    }
 
 //    // 검색탭 게시물 피드

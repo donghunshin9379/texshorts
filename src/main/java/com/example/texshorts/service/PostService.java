@@ -4,7 +4,6 @@ import com.example.texshorts.dto.PostCreateRequest;
 import com.example.texshorts.dto.message.PostCreationMessage;
 import com.example.texshorts.entity.Post;
 import com.example.texshorts.repository.PostRepository;
-import com.example.texshorts.repository.ViewHistoryRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;

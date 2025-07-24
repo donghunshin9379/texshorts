@@ -26,6 +26,7 @@ public class RedisCacheService {
     private final ObjectMapper objectMapper;
 
     private static final Duration DEFAULT_TTL = Duration.ofMinutes(30);
+    private static final Duration VIEWED_POST_TTL = Duration.ofHours(1);
 
     private static final String COMMENT_LIST_KEY_PREFIX = "post:comments:";
     private static final String COMMENT_COUNT_KEY_PREFIX = "post:commentCount:";
@@ -33,6 +34,8 @@ public class RedisCacheService {
     private static final String REPLY_COUNT_KEY_PREFIX = "comment:replyCount:";
     private static final String POST_REACTION_KEY_PREFIX = "post:";
     private static final String POST_LIST_KEY_PREFIX = "posts:page:";
+    private static final String VIEWED_USER_POST_PREFIX = "viewed:user:";
+    private static final String VIEW_COUNT_PREFIX = "viewCount:";
 
     private static final Logger logger = LoggerFactory.getLogger(RedisCacheService.class);
 
@@ -254,4 +257,38 @@ public class RedisCacheService {
         setAs(key, String.valueOf(dbCount));
         return dbCount;
     }
+
+
+    // === Post View 캐시 관련 ===
+    // 게시물 조회 여부
+    public boolean hasViewed(Long userId, Long postId) {
+        String key = VIEWED_USER_POST_PREFIX + userId + ":post:" + postId;
+        return get(key) != null;
+    }
+
+    // 게시물 조회수 증가 (Redis 카운트 증가)
+    public Long incrementViewCount(Long postId) {
+        return increment(VIEW_COUNT_PREFIX + postId);
+    }
+
+    // 조회 기록 캐시 저장 (유저-게시물 조회 이력)
+    public void cacheViewHistory(Long userId, Long postId) {
+        String key = VIEWED_USER_POST_PREFIX + userId + ":post:" + postId;
+        setAs(key, "1", VIEWED_POST_TTL);
+    }
+
+    public Long getViewCount(Long postId) {
+        String key = VIEW_COUNT_PREFIX + postId;
+        String value = get(key); // RedisCacheService get() 메서드 호출
+        if (value == null) return null;
+        try {
+            return Long.valueOf(value);
+        } catch (NumberFormatException e) {
+            logger.warn("View count 파싱 실패: {}", e.getMessage());
+            return null;
+        }
+    }
+
+
+
 }

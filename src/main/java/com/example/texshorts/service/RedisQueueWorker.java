@@ -1,8 +1,10 @@
 package com.example.texshorts.service;
 
 import com.example.texshorts.component.CommentCountFlusher;
+import com.example.texshorts.component.PostCreationService;
+import com.example.texshorts.component.PostDeletionService;
+import com.example.texshorts.component.ViewCountFlusher;
 import com.example.texshorts.dto.message.PostCreationMessage;
-import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,10 +20,13 @@ public class RedisQueueWorker implements Runnable {
     private final PostCreationService postCreationService;
     private final PostDeletionService postDeletionService;
     private final CommentCountFlusher commentCountFlusher;
+    private final ViewCountFlusher viewCountFlusher;
 
+    private static final String CREATE_QUEUE = "create:post:queue";
     private static final String DELETE_QUEUE = "delete:post:queue";
     private static final String COMMENT_COUNT_UPDATE_QUEUE = "update:commentCount:queue";
-    private static final String CREATE_QUEUE = "create:post:queue";
+    private static final String VIEW_COUNT_UPDATE_QUEUE = "update:viewCount:queue";
+
 
     private static final Logger logger = LoggerFactory.getLogger(RedisQueueWorker.class);
 
@@ -36,7 +41,7 @@ public class RedisQueueWorker implements Runnable {
                 /** 게시물 생성 큐 처리 */
                 Object messageObj = redisTemplate.opsForList().leftPop(CREATE_QUEUE, 1, TimeUnit.SECONDS);
                 if (messageObj instanceof PostCreationMessage msg) {
-                        postCreationService.createPostFromMessage(msg);
+                    postCreationService.createPostFromMessage(msg);
                     continue;
                 }
 
@@ -56,9 +61,19 @@ public class RedisQueueWorker implements Runnable {
                     continue;
                 }
 
+                /** 조회수 갱신 큐 처리 */
+                String viewCountPostIdStr = (String) redisTemplate.opsForList().leftPop(VIEW_COUNT_UPDATE_QUEUE, 1, TimeUnit.SECONDS);
+                if (viewCountPostIdStr != null) {
+                    Long postId = Long.parseLong(viewCountPostIdStr);
+                    viewCountFlusher.flushViewCountToDatabase(postId);
+                    continue;
+                }
+
                 /** 큐 모두 비어있으면 종료 */
-                if (redisTemplate.opsForList().size(DELETE_QUEUE) == 0 &&
-                        redisTemplate.opsForList().size(COMMENT_COUNT_UPDATE_QUEUE) == 0) {
+                if (redisTemplate.opsForList().size(CREATE_QUEUE) == 0 &&
+                    redisTemplate.opsForList().size(DELETE_QUEUE) == 0 &&
+                    redisTemplate.opsForList().size(VIEW_COUNT_UPDATE_QUEUE) == 0 &&
+                    redisTemplate.opsForList().size(COMMENT_COUNT_UPDATE_QUEUE) == 0) {
                     logger.info("큐 비어 있음, RedisQueueWorker 종료");
                     running = false;
                     break;

@@ -23,7 +23,6 @@ import java.util.stream.Collectors;
 public class PostFeedService {
     private final PostRepository postRepository;
     private final RedisCacheService redisCacheService;
-    private final ViewHistoryRepository viewHistoryRepository;
 
     /** Redis 캐시된 게시물 조회/저장
      * 
@@ -44,17 +43,6 @@ public class PostFeedService {
                 .map(this::toDto)
                 .collect(Collectors.toList());
     }
-
-    @Transactional
-    public void increaseViewCountIfNotViewed(Long postId, Long userId) {
-        if (!viewHistoryRepository.existsByUserIdAndPostId(userId, postId)) {
-            postRepository.incrementViewCount(postId);
-            viewHistoryRepository.save(
-                    new ViewHistory(userId, postRepository.getReferenceById(postId), LocalDateTime.now())
-            );
-        }
-    }
-
 
 
     /** 게시물 목록 조회 API 호출용

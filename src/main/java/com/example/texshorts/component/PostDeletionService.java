@@ -1,4 +1,4 @@
-package com.example.texshorts.service;
+package com.example.texshorts.component;
 
 import com.example.texshorts.entity.Comment;
 import com.example.texshorts.entity.Post;
@@ -6,6 +6,7 @@ import com.example.texshorts.entity.ViewHistory;
 import com.example.texshorts.repository.CommentRepository;
 import com.example.texshorts.repository.PostRepository;
 import com.example.texshorts.repository.ViewHistoryRepository;
+import com.example.texshorts.service.TagHubService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
