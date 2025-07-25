@@ -23,10 +23,8 @@ public class TagHub { //posts tag -> TagHub -> UserInterestTag
     private String tagName;  // "#서울", "#도쿄" 등
 
     @Column(nullable = false)
-    @Builder.Default
     private Long usageCount = 0L;  // 태그가 사용된 횟수 (default 0)
 
-    @Builder.Default
     @OneToMany(mappedBy = "tagHub", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<UserInterestTag> userInterestTags = new HashSet<>();
 

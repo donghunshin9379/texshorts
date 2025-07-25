@@ -11,6 +11,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
 
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 @Component
 @RequiredArgsConstructor
@@ -19,14 +20,15 @@ public class RedisQueueWorker implements Runnable {
     private final RedisTemplate<String, Object> redisTemplate;
     private final PostCreationService postCreationService;
     private final PostDeletionService postDeletionService;
+    private final UserInterestTagService userInterestTagService;
     private final CommentCountFlusher commentCountFlusher;
     private final ViewCountFlusher viewCountFlusher;
 
     private static final String CREATE_QUEUE = "create:post:queue";
     private static final String DELETE_QUEUE = "delete:post:queue";
+    private static final String USER_INTEREST_TAG_QUEUE = "update:userInterestTag:queue";
     private static final String COMMENT_COUNT_UPDATE_QUEUE = "update:commentCount:queue";
     private static final String VIEW_COUNT_UPDATE_QUEUE = "update:viewCount:queue";
-
 
     private static final Logger logger = LoggerFactory.getLogger(RedisQueueWorker.class);
 
@@ -69,11 +71,31 @@ public class RedisQueueWorker implements Runnable {
                     continue;
                 }
 
+                /** 관심태그 갱신 큐 처리 */
+                Object msgObj = redisTemplate.opsForList().leftPop(USER_INTEREST_TAG_QUEUE, 1, TimeUnit.SECONDS);
+                if (msgObj instanceof Map<?, ?> map) {
+                    Long userId = ((Number) map.get("userId")).longValue();
+                    String tagName = (String) map.get("tagName");
+                    String action = (String) map.get("action");
+
+                    if ("add".equalsIgnoreCase(action)) {
+                        userInterestTagService.addUserInterestTag(userId, tagName);
+                        logger.info("UserInterestTag 추가 처리: userId={}, tagName={}", userId, tagName);
+                    } else if ("remove".equalsIgnoreCase(action)) {
+                        userInterestTagService.removeUserInterestTag(userId, tagName);
+                        logger.info("UserInterestTag 삭제 처리: userId={}, tagName={}", userId, tagName);
+                    } else {
+                        logger.warn("알 수 없는 action: {}", action);
+                    }
+                    continue;
+                }
+
                 /** 큐 모두 비어있으면 종료 */
                 if (redisTemplate.opsForList().size(CREATE_QUEUE) == 0 &&
                     redisTemplate.opsForList().size(DELETE_QUEUE) == 0 &&
                     redisTemplate.opsForList().size(VIEW_COUNT_UPDATE_QUEUE) == 0 &&
-                    redisTemplate.opsForList().size(COMMENT_COUNT_UPDATE_QUEUE) == 0) {
+                    redisTemplate.opsForList().size(COMMENT_COUNT_UPDATE_QUEUE) == 0 &&
+                    redisTemplate.opsForList().size(USER_INTEREST_TAG_QUEUE) == 0) {
                     logger.info("큐 비어 있음, RedisQueueWorker 종료");
                     running = false;
                     break;
