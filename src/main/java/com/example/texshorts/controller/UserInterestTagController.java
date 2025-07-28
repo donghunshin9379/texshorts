@@ -1,8 +1,10 @@
 package com.example.texshorts.controller;
 
+import com.example.texshorts.custom.CustomUserDetails;
 import com.example.texshorts.service.RequestRedisQueue;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -17,14 +19,14 @@ public class UserInterestTagController {
     private final RequestRedisQueue requestRedisQueue;
 
     @PostMapping("/add")
-    public ResponseEntity<String> addInterestTag(@RequestParam Long userId, @RequestParam String tagName) {
-        requestRedisQueue.enqueueUserInterestTagUpdate(userId, tagName, "add");
+    public ResponseEntity<String> addInterestTag(@AuthenticationPrincipal CustomUserDetails userDetails, @RequestParam String tagName) {
+        requestRedisQueue.enqueueUserInterestTagUpdate(userDetails.getUserId(), tagName, "add");
         return ResponseEntity.ok("관심태그 추가 요청이 큐에 저장되었습니다.");
     }
 
     @PostMapping("/remove") /**갱신하기 OR 삭제 + 생성하기 고민 */
-    public ResponseEntity<String> removeInterestTag(@RequestParam Long userId, @RequestParam String tagName) {
-        requestRedisQueue.enqueueUserInterestTagUpdate(userId, tagName, "remove");
+    public ResponseEntity<String> removeInterestTag(@AuthenticationPrincipal CustomUserDetails userDetails, @RequestParam String tagName) {
+        requestRedisQueue.enqueueUserInterestTagUpdate(userDetails.getUserId(), tagName, "remove");
         return ResponseEntity.ok("관심태그 삭제 요청이 큐에 저장되었습니다.");
     }
 

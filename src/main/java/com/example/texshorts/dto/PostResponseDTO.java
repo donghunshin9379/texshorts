@@ -20,6 +20,7 @@ public class PostResponseDTO {  /** 게시물 출력용 바디 DTO*/
     private LocalDateTime createdAt;
     private List<String> contentLines;
     private String tags;
+    private Long postId;
 
     /**
      * Entity → DTO 변환 메서드
@@ -35,6 +36,7 @@ public class PostResponseDTO {  /** 게시물 출력용 바디 DTO*/
         dto.setThumbnailUrl(urlGenerator.apply(post.getThumbnailPath()));  // 썸네일 경로 → URL
         dto.setCreatedAt(post.getCreatedAt());
         dto.setTags(post.getTags());
+        dto.setPostId(post.getId());
 
         // contentLines가 있다면, 예를 들어 content를 줄 단위로 나누기
         if(post.getContent() != null) {

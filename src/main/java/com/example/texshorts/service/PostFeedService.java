@@ -1,47 +1,91 @@
 package com.example.texshorts.service;
 
 import com.example.texshorts.dto.PostResponseDTO;
+import com.example.texshorts.entity.FeedType;
 import com.example.texshorts.entity.Post;
-import com.example.texshorts.entity.ViewHistory;
 import com.example.texshorts.repository.PostRepository;
-import com.example.texshorts.repository.ViewHistoryRepository;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class PostFeedService {
+
     private final PostRepository postRepository;
     private final RedisCacheService redisCacheService;
+    private static final Logger logger = LoggerFactory.getLogger(PostFeedService.class);
 
-    /** Redis 캐시된 게시물 조회/저장
-     * 
+    /** 피드 종류
+     * LATEST: 최근 피드
+     * POPULAR: 인기피드
+     * PERSONALIZED: 개인화 피드
      * */
-    public List<PostResponseDTO> getPostsPagedWithCache(int page, int size) {
-        List<PostResponseDTO> cached = redisCacheService.getCachedPostList(page, size);
-        if (cached != null) return cached;
-
-        List<PostResponseDTO> fresh = getPostsPaged(page, size);
-        redisCacheService.cachePostList(page, size, fresh);
-        return fresh;
+    public List<PostResponseDTO> getFeed(FeedType type, int page, int size, Long userId) {
+        return switch (type) {
+            case LATEST -> getLatestPosts(page, size, userId);
+            case POPULAR -> getPopularPosts(page, size);
+            case PERSONALIZED -> getPersonalizedPosts(page, size, userId);
+        };
     }
 
-    /** DB > 캐시 저장 */
-    public List<PostResponseDTO> getPostsPaged(int page, int size) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+    /** 최근 피드 get
+     * 피드 중복 방지
+     *
+     * */
+    private List<PostResponseDTO> getLatestPosts(int page, int size, Long userId) {
+        List<PostResponseDTO> cached = redisCacheService.getCachedPostList(page, size);
+        if (cached == null) {
+            logger.info("최근 피드 캐시 없음, DB에서 조회 시작");
+
+            Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+            cached = postRepository.findAll(pageable).stream()
+                    .map(this::toDto)
+                    .collect(Collectors.toList());
+
+            redisCacheService.cachePostList(page, size, cached);
+        }
+
+        if (userId != null) {
+            Set<String> seenPostIds = redisCacheService.getSeenFeedPostIds(userId);
+            if (seenPostIds != null && !seenPostIds.isEmpty()) {
+                cached = cached.stream()
+                        .filter(post -> !seenPostIds.contains(String.valueOf(post.getPostId())))
+                        .collect(Collectors.toList());
+            }
+
+            logger.info("필터링 이후 피드 크기: {}", cached.size());
+        }
+
+        return cached;
+    }
+
+
+
+
+    /**캐싱 적용 필요*/
+    private List<PostResponseDTO> getPopularPosts(int page, int size) {
+        // 캐시 or DB 조회 기반 인기 정렬
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "viewCount"));
         return postRepository.findAll(pageable).stream()
                 .map(this::toDto)
                 .collect(Collectors.toList());
+    }
+
+    private List<PostResponseDTO> getPersonalizedPosts(int page, int size, Long userId) {
+        // TODO: 유저의 관심 태그 기반 추천 로직
+        // 예시: postRepository.findByTagsIn(userTags, pageable);
+        return new ArrayList<>();
     }
 
 
@@ -56,7 +100,8 @@ public class PostFeedService {
                 post.getThumbnailPath(),
                 post.getCreatedAt(),
                 lines,
-                post.getTags()
+                post.getTags(),
+                post.getId()
         );
     }
 

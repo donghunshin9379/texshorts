@@ -24,7 +24,7 @@ public class ViewService {
     @Transactional
     public void increaseViewCountIfNotViewed(Long postId, Long userId) {
 
-        /** 중복시청 확인 */
+        /** 중복시청 방지 */
         if (redisCacheService.hasViewed(userId, postId)) { /**캐시에 조회기록 있을시 실행 X*/
             logger.info("중복시청 if 필터 걸림! userId : {}", userId);
             logger.info("중복시청 if 필터 걸림! postId : {}", postId);

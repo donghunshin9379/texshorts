@@ -1,6 +1,5 @@
 package com.example.texshorts.service;
 
-
 import com.example.texshorts.dto.CommentResponseDTO;
 import com.example.texshorts.dto.PostResponseDTO;
 import com.example.texshorts.entity.ReactionType;
@@ -15,13 +14,14 @@ import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.Set;
 import java.util.function.Supplier;
 
 @Service
 @RequiredArgsConstructor
 public class RedisCacheService {
 
-    private final RedisTemplate<String, Object> redisTemplate;
+    private final RedisTemplate<String, String> redisTemplate;
     private final CommentRepository commentRepository;
     private final ObjectMapper objectMapper;
 
@@ -42,8 +42,8 @@ public class RedisCacheService {
     // 기본 get: 문자열 반환
     public String get(String key) {
         try {
-            Object val = redisTemplate.opsForValue().get(key);
-            return val != null ? val.toString() : null;
+            String val = redisTemplate.opsForValue().get(key);
+            return val != null ? val : null;
         } catch (Exception e) {
             logger.warn("Redis get 실패: {}", e.getMessage());
             return null;
@@ -119,24 +119,19 @@ public class RedisCacheService {
     }
 
     // === 게시물 리스트 관련 ===
-    // 캐시에서 게시물 리스트 조회
     public List<PostResponseDTO> getCachedPostList(int page, int size) {
         String key = POST_LIST_KEY_PREFIX + page + ":size:" + size;
         return getListAs(key, PostResponseDTO.class);
     }
 
-    // 게시물 리스트 캐시 저장
     public void cachePostList(int page, int size, List<PostResponseDTO> posts) {
         String key = POST_LIST_KEY_PREFIX + page + ":size:" + size;
         setAs(key, posts, DEFAULT_TTL);
     }
 
-    // 캐시 갱신(삭제 + 재생성)
     public void updatePostListCache(int page, int size, List<PostResponseDTO> posts) {
         cachePostList(page, size, posts);
     }
-
-
 
     // === 댓글 수 관련 ===
     public int getRootCommentCount(Long postId) {
@@ -162,7 +157,6 @@ public class RedisCacheService {
         decrement(COMMENT_COUNT_KEY_PREFIX + postId);
     }
 
-
     // === 답글 수 관련 ===
     public int getReplyCount(Long parentCommentId) {
         String key = REPLY_COUNT_KEY_PREFIX + parentCommentId;
@@ -187,7 +181,6 @@ public class RedisCacheService {
         decrement(REPLY_COUNT_KEY_PREFIX + parentCommentId);
     }
 
-
     // === 댓글 목록 캐싱 ===
     public List<CommentResponseDTO> getCachedRootComments(Long postId) {
         return getListAs(COMMENT_LIST_KEY_PREFIX + postId, CommentResponseDTO.class);
@@ -201,7 +194,6 @@ public class RedisCacheService {
         delete(COMMENT_LIST_KEY_PREFIX + postId);
     }
 
-
     // === 답글 목록 캐싱 ===
     public List<CommentResponseDTO> getCachedReplies(Long parentCommentId) {
         return getListAs(REPLY_LIST_KEY_PREFIX + parentCommentId, CommentResponseDTO.class);
@@ -214,7 +206,6 @@ public class RedisCacheService {
     public void evictReplyList(Long parentCommentId) {
         delete(REPLY_LIST_KEY_PREFIX + parentCommentId);
     }
-
 
     // === Post Reaction 캐시 관련 ===
     private String getPostReactionKey(Long postId, ReactionType type) {
@@ -258,7 +249,6 @@ public class RedisCacheService {
         return dbCount;
     }
 
-
     // === Post View 캐시 관련 ===
     // 게시물 조회 여부
     public boolean hasViewed(Long userId, Long postId) {
@@ -271,15 +261,23 @@ public class RedisCacheService {
         return increment(VIEW_COUNT_PREFIX + postId);
     }
 
-    // 조회 기록 캐시 저장 (유저-게시물 조회 이력)
+    // 유저-게시물 조회 이력 (조회수 중복 증가 방지)
     public void cacheViewHistory(Long userId, Long postId) {
-        String key = VIEWED_USER_POST_PREFIX + userId + ":post:" + postId;
-        setAs(key, "1", VIEWED_POST_TTL);
+        String key = VIEWED_USER_POST_PREFIX + userId + ":posts";
+        redisTemplate.opsForSet().add(key, postId.toString());
+        redisTemplate.expire(key, VIEWED_POST_TTL);
+    }
+
+    // 조회한 게시물 ID 목록 조회
+    public Set<String> getViewedPostIdSet(Long userId) {
+        String key = VIEWED_USER_POST_PREFIX + userId + ":posts";
+        Set<String> members = redisTemplate.opsForSet().members(key);
+        return members;
     }
 
     public Long getViewCount(Long postId) {
         String key = VIEW_COUNT_PREFIX + postId;
-        String value = get(key); // RedisCacheService get() 메서드 호출
+        String value = get(key);
         if (value == null) return null;
         try {
             return Long.valueOf(value);
@@ -290,5 +288,25 @@ public class RedisCacheService {
     }
 
 
+    // === Post Feed 캐시 관련 ===
+    // 본 피드 postId 저장 [중복 피드 노출 방지(저장)]
+    public void cacheSeenFeedPost(Long userId, Long postId) {
+        String key = "feed:seen:" + userId;
+        redisTemplate.opsForSet().add(key, postId.toString());
+        redisTemplate.expire(key, Duration.ofDays(1)); // 1일 TTL
+    }
+
+    // 피드에서 본 post ID (조회)
+    public Set<String> getSeenFeedPostIds(Long userId) {
+        String key = "feed:seen:" + userId;
+        return redisTemplate.opsForSet().members(key);
+    }
+
+    /** 노출 피드 누적 1일 TTL이지만 필요시 수동 초기화용*/
+    // 본 게시물 ID 기록 초기화(삭제)
+    public void evictSeenFeedPosts(Long userId) {
+        String key = "feed:seen:" + userId;
+        redisTemplate.delete(key);
+    }
 
 }

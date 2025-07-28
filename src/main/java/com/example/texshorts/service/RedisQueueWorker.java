@@ -78,6 +78,7 @@ public class RedisQueueWorker implements Runnable {
                     String tagName = (String) map.get("tagName");
                     String action = (String) map.get("action");
 
+                    /**ADD / REMOVE (갱신 OR 삭제) 현재는 REMOVE */
                     if ("add".equalsIgnoreCase(action)) {
                         userInterestTagService.addUserInterestTag(userId, tagName);
                         logger.info("UserInterestTag 추가 처리: userId={}, tagName={}", userId, tagName);

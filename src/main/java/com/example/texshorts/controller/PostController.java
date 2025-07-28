@@ -30,14 +30,6 @@ public class PostController {
 
     private static final Logger logger = LoggerFactory.getLogger(PostController.class);
 
-    @GetMapping("/posts")
-    public ResponseEntity<List<PostResponseDTO>> getPostsPaged(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size
-    ) {
-        return ResponseEntity.ok(postFeedService.getPostsPagedWithCache(page, size));
-    }
-
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> createPost(
             @RequestPart("thumbnail") MultipartFile thumbnail,

@@ -37,14 +37,13 @@ public class UserInterestTagService {
         TagHub tagHub = tagHubRepository.findByTagName(tagName)
                 .orElseGet(() -> tagHubRepository.save(TagHub.builder().tagName(tagName).usageCount(0L).build()));
 
+        /** */
         if (!userInterestTagRepository.existsByUserIdAndTagHubId(userId, tagHub.getId())) {
             UserInterestTag userInterestTag = UserInterestTag.builder()
                     .user(user)
                     .tagHub(tagHub)
                     .build();
             userInterestTagRepository.save(userInterestTag);
-            tagHub.incrementUsageCount();
-            tagHubRepository.save(tagHub);
         }
     }
 

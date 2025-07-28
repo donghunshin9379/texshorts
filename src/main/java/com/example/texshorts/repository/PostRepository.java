@@ -20,11 +20,12 @@ public interface PostRepository extends JpaRepository<Post, Long> {
     @EntityGraph(attributePaths = "user") // user를 페치조인으로 같이 가져오도록 설정
     Page<Post> findAll(Pageable pageable);
 
+    // Post 테이블 comment_count 증가
     @Modifying
     @Query("UPDATE Post p SET p.commentCount = :count WHERE p.id = :postId")
     void updateCommentCount(@Param("postId") Long postId, @Param("count") int count);
 
-
+    // Post 테이블 view_count 증가
     @Modifying
     @Query("UPDATE Post p SET p.viewCount = :count WHERE p.id = :postId")
     void updateViewCount(@Param("postId") Long postId, @Param("count") int count);
