@@ -19,6 +19,7 @@ public class RequestRedisQueue {
 
     private static final String CREATE_QUEUE = "create:post:queue";
     private static final String DELETE_QUEUE = "delete:post:queue";
+    private static final String LIKE_COUNT_UPDATE_QUEUE = "update:like_count:queue";
     private static final String COMMENT_COUNT_UPDATE_QUEUE = "update:commentCount:queue";
     private static final String VIEW_COUNT_UPDATE_QUEUE = "update:viewCount:queue";
     private static final String USER_INTEREST_TAG_QUEUE = "update:userInterestTag:queue";
@@ -51,6 +52,13 @@ public class RequestRedisQueue {
         redisQueueWorker.trigger();
     }
 
+    // 좋아요 수 갱신 큐 요청
+    public void enqueueLikeCountUpdate(Long postId) {
+        redisTemplate.opsForList().rightPush(LIKE_COUNT_UPDATE_QUEUE, String.valueOf(postId));
+        logger.info("좋아요 수 갱신 큐 요청: postId={}", postId);
+        redisQueueWorker.trigger();
+    }
+
     // 관심태그 갱신 큐 요청 (관심태그 생성 / 삭제)
     public void enqueueUserInterestTagUpdate(Long userId, String tagName, String action) {
         //DTO 대신 Map 활용
@@ -62,6 +70,12 @@ public class RequestRedisQueue {
         redisTemplate.opsForList().rightPush(USER_INTEREST_TAG_QUEUE, message);
         logger.info("UserInterestTag 큐 요청: userId={}, tagName={}, action={}", userId, tagName, action);
 
+        redisQueueWorker.trigger();
+    }
+
+    // 인기 피드 갱신 큐 요청
+    public void enqueuePopularFeedRefresh() {
+        redisTemplate.opsForList().rightPush("update:popularFeed:queue", "trigger");
         redisQueueWorker.trigger();
     }
 

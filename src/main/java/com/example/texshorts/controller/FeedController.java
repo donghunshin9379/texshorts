@@ -38,6 +38,7 @@ public class FeedController {
     }
 
     // 피드 게시물 노출 기록 저장 (실시간 중복 필터용 현재 TTL : 1일 )
+    /**서버입장 중복피드노출 방지*/
     @PostMapping("/seen")
     public ResponseEntity<Void> markPostAsSeen(
             @AuthenticationPrincipal CustomUserDetails userDetails,

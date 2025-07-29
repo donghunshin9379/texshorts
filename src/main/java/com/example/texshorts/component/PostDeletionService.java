@@ -5,6 +5,7 @@ import com.example.texshorts.entity.Post;
 import com.example.texshorts.entity.ViewHistory;
 import com.example.texshorts.repository.CommentRepository;
 import com.example.texshorts.repository.PostRepository;
+import com.example.texshorts.repository.PostViewRepository;
 import com.example.texshorts.repository.ViewHistoryRepository;
 import com.example.texshorts.service.TagHubService;
 import jakarta.persistence.EntityNotFoundException;
@@ -22,6 +23,7 @@ public class PostDeletionService {
     private final CommentRepository commentRepository;
     private final ViewHistoryRepository viewHistoryRepository;
     private final TagHubService tagHubService;
+    private final PostViewRepository postViewRepository;
 
     private static final Logger logger = LoggerFactory.getLogger(PostDeletionService.class);
 
@@ -34,6 +36,7 @@ public class PostDeletionService {
         tagHubService.decreaseTagUsageFromPost(post);
 
         postRepository.deleteById(postId);
+        postViewRepository.deleteByPostId(postId);
     }
 
     private void deleteCommentsInBatches(Long postId) {

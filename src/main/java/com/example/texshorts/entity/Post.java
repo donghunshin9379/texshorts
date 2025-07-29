@@ -50,14 +50,18 @@ public class Post {
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
-    // 양방향 관계
-    @OneToMany(mappedBy = "post", cascade = CascadeType.ALL)
-    private List<PostReaction> reactions = new ArrayList<>();
+//    // 양방향 관계
+//    @OneToMany(mappedBy = "post", cascade = CascadeType.ALL)
+//    private List<PostReaction> reactions = new ArrayList<>();
 
 
     // 단순 텍스트 저장(보여지는 태그)
     @Column(name = "tags")
     private String tags;
+
+    //좋아요 갯수
+    @Column(name = "like_count", nullable = false)
+    private int likeCount = 0;
 
     // 댓글 갯수
     @Column(name = "comment_count", nullable = false)

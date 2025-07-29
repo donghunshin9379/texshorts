@@ -5,6 +5,7 @@ import com.example.texshorts.dto.PostResponseDTO;
 import com.example.texshorts.entity.ReactionType;
 import com.example.texshorts.repository.CommentRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -27,13 +28,16 @@ public class RedisCacheService {
 
     private static final Duration DEFAULT_TTL = Duration.ofMinutes(30);
     private static final Duration VIEWED_POST_TTL = Duration.ofHours(1);
-
+    /**게시물 피드(캐시) 갱신 주기*/
+    public static final Duration POST_LIST_TTL = Duration.ofMinutes(10);
+    
     private static final String COMMENT_LIST_KEY_PREFIX = "post:comments:";
     private static final String COMMENT_COUNT_KEY_PREFIX = "post:commentCount:";
     private static final String REPLY_LIST_KEY_PREFIX = "comment:replies:";
     private static final String REPLY_COUNT_KEY_PREFIX = "comment:replyCount:";
     private static final String POST_REACTION_KEY_PREFIX = "post:";
-    private static final String POST_LIST_KEY_PREFIX = "posts:page:";
+    public static final String LATEST_POST_LIST_KEY_PREFIX = "post:latest:";         // 최신 피드
+    public static final String POPULAR_POST_LIST_KEY_PREFIX = "post:popular:"; // 인기 피드
     private static final String VIEWED_USER_POST_PREFIX = "viewed:user:";
     private static final String VIEW_COUNT_PREFIX = "viewCount:";
 
@@ -63,7 +67,8 @@ public class RedisCacheService {
         }
     }
 
-    // JSON -> List<T> 역직렬화
+    // 역직렬화
+    // class기반
     public <T> List<T> getListAs(String key, Class<T> clazz) {
         String json = get(key);
         if (json == null) return null;
@@ -71,9 +76,23 @@ public class RedisCacheService {
         try {
             return objectMapper.readValue(
                     json,
-                    objectMapper.getTypeFactory().constructCollectionType(List.class, clazz));
+                    objectMapper.getTypeFactory().constructCollectionType(List.class, clazz)
+            );
         } catch (Exception e) {
             logger.warn("Redis JSON List 역직렬화 실패: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    // 제네릭 리스트 역직렬화
+    // TypeReference 기반
+    public <T> List<T> getListAs(String key, TypeReference<List<T>> typeReference) {
+        String json = get(key);
+        if (json == null) return null;
+        try {
+            return objectMapper.readValue(json, typeReference);
+        } catch (Exception e) {
+            logger.warn("리스트 역직렬화 실패: {}", e.getMessage());
             return null;
         }
     }
@@ -116,21 +135,6 @@ public class RedisCacheService {
             logger.warn("Redis decrement 실패: {}", e.getMessage());
             return null;
         }
-    }
-
-    // === 게시물 리스트 관련 ===
-    public List<PostResponseDTO> getCachedPostList(int page, int size) {
-        String key = POST_LIST_KEY_PREFIX + page + ":size:" + size;
-        return getListAs(key, PostResponseDTO.class);
-    }
-
-    public void cachePostList(int page, int size, List<PostResponseDTO> posts) {
-        String key = POST_LIST_KEY_PREFIX + page + ":size:" + size;
-        setAs(key, posts, DEFAULT_TTL);
-    }
-
-    public void updatePostListCache(int page, int size, List<PostResponseDTO> posts) {
-        cachePostList(page, size, posts);
     }
 
     // === 댓글 수 관련 ===
@@ -235,26 +239,14 @@ public class RedisCacheService {
         decrement(getPostReactionKey(postId, type));
     }
 
-    public Long getPostReactionCount(Long postId, ReactionType type, Long dbCount) {
-        String key = getPostReactionKey(postId, type);
-        String cached = get(key);
-        if (cached != null) {
-            try {
-                return Long.parseLong(cached);
-            } catch (NumberFormatException e) {
-                logger.warn("Post Reaction count 파싱 실패: {}", e.getMessage());
-            }
-        }
-        setAs(key, String.valueOf(dbCount));
-        return dbCount;
-    }
 
     // === Post View 캐시 관련 ===
     // 게시물 조회 여부
     public boolean hasViewed(Long userId, Long postId) {
-        String key = VIEWED_USER_POST_PREFIX + userId + ":post:" + postId;
-        return get(key) != null;
+        String key = VIEWED_USER_POST_PREFIX + userId + ":posts";
+        return redisTemplate.opsForSet().isMember(key, postId.toString());
     }
+
 
     // 게시물 조회수 증가 (Redis 카운트 증가)
     public Long incrementViewCount(Long postId) {
@@ -289,21 +281,31 @@ public class RedisCacheService {
 
 
     // === Post Feed 캐시 관련 ===
-    // 본 피드 postId 저장 [중복 피드 노출 방지(저장)]
+    /**피드 캐시 get*/
+    public List<PostResponseDTO> getCachedPostList(int page, int size, String prefix) {
+        String key = prefix + page + ":size:" + size;
+        return getListAs(key, new TypeReference<>() {});
+    }
+
+    /** 피드 캐시 저장*/
+    public void cachePostList(int page, int size, List<PostResponseDTO> posts, String prefix) {
+        String key = prefix + page + ":size:" + size;
+        setAs(key, posts, POST_LIST_TTL);
+    }
+
+
+    /** 노출피드 중복방지 */
     public void cacheSeenFeedPost(Long userId, Long postId) {
         String key = "feed:seen:" + userId;
         redisTemplate.opsForSet().add(key, postId.toString());
-        redisTemplate.expire(key, Duration.ofDays(1)); // 1일 TTL
+        redisTemplate.expire(key, Duration.ofDays(1));
     }
 
-    // 피드에서 본 post ID (조회)
     public Set<String> getSeenFeedPostIds(Long userId) {
         String key = "feed:seen:" + userId;
         return redisTemplate.opsForSet().members(key);
     }
 
-    /** 노출 피드 누적 1일 TTL이지만 필요시 수동 초기화용*/
-    // 본 게시물 ID 기록 초기화(삭제)
     public void evictSeenFeedPosts(Long userId) {
         String key = "feed:seen:" + userId;
         redisTemplate.delete(key);

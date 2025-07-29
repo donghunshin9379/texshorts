@@ -74,10 +74,5 @@ public class CommentReactionService {
         redisCacheService.decrementPostReactionCount(commentId, type);
     }
 
-    public Long getReactionCount(Long commentId, ReactionType type) {
-        long dbCount = commentReactionRepository.countByCommentIdAndType(commentId, type);
-        return redisCacheService.getPostReactionCount(commentId, type, dbCount);
-    }
-
 
 }

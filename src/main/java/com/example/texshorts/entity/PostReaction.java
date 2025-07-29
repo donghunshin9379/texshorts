@@ -5,6 +5,7 @@ import lombok.Data;
 
 @Entity
 @Data
+@Table(uniqueConstraints = @UniqueConstraint(columnNames = {"user_id", "post_id"})) // 중복 리액션 제약
 public class PostReaction {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

@@ -28,5 +28,6 @@ public class ViewController {
         return ResponseEntity.ok().build();
     }
 
+    /**GET 추가 필요 (조회수 get)*/
 
 }

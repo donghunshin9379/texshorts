@@ -1,9 +1,6 @@
 package com.example.texshorts.service;
 
-import com.example.texshorts.component.CommentCountFlusher;
-import com.example.texshorts.component.PostCreationService;
-import com.example.texshorts.component.PostDeletionService;
-import com.example.texshorts.component.ViewCountFlusher;
+import com.example.texshorts.component.*;
 import com.example.texshorts.dto.message.PostCreationMessage;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -23,12 +20,17 @@ public class RedisQueueWorker implements Runnable {
     private final UserInterestTagService userInterestTagService;
     private final CommentCountFlusher commentCountFlusher;
     private final ViewCountFlusher viewCountFlusher;
+    private final PopularFeedRefresher popularFeedRefresher;
+    private final ReactionCountFlusher reactionCountFlusher;
 
     private static final String CREATE_QUEUE = "create:post:queue";
     private static final String DELETE_QUEUE = "delete:post:queue";
     private static final String USER_INTEREST_TAG_QUEUE = "update:userInterestTag:queue";
+    private static final String LIKE_COUNT_UPDATE_QUEUE = "update:like_count:queue";
     private static final String COMMENT_COUNT_UPDATE_QUEUE = "update:commentCount:queue";
     private static final String VIEW_COUNT_UPDATE_QUEUE = "update:viewCount:queue";
+    private static final String POPULAR_FEED_UPDATE_QUEUE = "update:popularFeed:queue";
+
 
     private static final Logger logger = LoggerFactory.getLogger(RedisQueueWorker.class);
 
@@ -52,6 +54,15 @@ public class RedisQueueWorker implements Runnable {
                 if (postIdStr != null) {
                     Long postId = Long.parseLong(postIdStr);
                     postDeletionService.deletePostHard(postId);
+                    continue;
+                }
+
+                /** 좋아요 카운트 갱신 큐 처리 */
+                String likeCountPostIdStr = (String) redisTemplate.opsForList().leftPop(LIKE_COUNT_UPDATE_QUEUE, 1, TimeUnit.SECONDS);
+                if (likeCountPostIdStr != null) {
+                    Long postId = Long.parseLong(likeCountPostIdStr);
+                    reactionCountFlusher.flushLikeCountToDatabase(postId);
+                    logger.info("LikeCount DB 반영 처리 완료: postId={}", postId);
                     continue;
                 }
 
@@ -91,12 +102,23 @@ public class RedisQueueWorker implements Runnable {
                     continue;
                 }
 
+                /** 인기 피드 캐시 갱신 큐 처리 */
+                String popularFeedSignal = (String) redisTemplate.opsForList().leftPop(POPULAR_FEED_UPDATE_QUEUE, 1, TimeUnit.SECONDS);
+                if (popularFeedSignal != null) {
+                    popularFeedRefresher.refreshPopularFeedCache();
+                    logger.info("인기 피드 캐시 갱신 완료");
+                    continue;
+                }
+
+
+
                 /** 큐 모두 비어있으면 종료 */
                 if (redisTemplate.opsForList().size(CREATE_QUEUE) == 0 &&
-                    redisTemplate.opsForList().size(DELETE_QUEUE) == 0 &&
-                    redisTemplate.opsForList().size(VIEW_COUNT_UPDATE_QUEUE) == 0 &&
-                    redisTemplate.opsForList().size(COMMENT_COUNT_UPDATE_QUEUE) == 0 &&
-                    redisTemplate.opsForList().size(USER_INTEREST_TAG_QUEUE) == 0) {
+                        redisTemplate.opsForList().size(DELETE_QUEUE) == 0 &&
+                        redisTemplate.opsForList().size(VIEW_COUNT_UPDATE_QUEUE) == 0 &&
+                        redisTemplate.opsForList().size(COMMENT_COUNT_UPDATE_QUEUE) == 0 &&
+                        redisTemplate.opsForList().size(USER_INTEREST_TAG_QUEUE) == 0 &&
+                        redisTemplate.opsForList().size(POPULAR_FEED_UPDATE_QUEUE) == 0) {
                     logger.info("큐 비어 있음, RedisQueueWorker 종료");
                     running = false;
                     break;

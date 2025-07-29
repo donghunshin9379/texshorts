@@ -10,4 +10,6 @@ public interface PostViewRepository extends JpaRepository<PostView, Long> {
 
     Optional<PostView> findByPostId(Long postId);
 
+    void deleteByPostId(Long postId);
+
 }
