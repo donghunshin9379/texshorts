@@ -22,12 +22,8 @@ public class Post {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
-    
-//    // Post엔티티 -> UserId 추출
-//    @Transient
-//    public Long getUserId() {
-//        return user != null ? user.getId() : null;
-//    }
+
+
 
     @Column(name = "view_count", nullable = false)
     private int viewCount = 0;
@@ -50,11 +46,6 @@ public class Post {
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
-//    // 양방향 관계
-//    @OneToMany(mappedBy = "post", cascade = CascadeType.ALL)
-//    private List<PostReaction> reactions = new ArrayList<>();
-
-
     // 단순 텍스트 저장(보여지는 태그)
     @Column(name = "tags")
     private String tags;
@@ -69,4 +60,8 @@ public class Post {
 
     @Column(name = "deleted", nullable = false)
     private boolean deleted = false;
+
+    // 실제 태그 저장
+    @OneToMany(mappedBy = "post", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<PostTag> postTags = new ArrayList<>();
 }

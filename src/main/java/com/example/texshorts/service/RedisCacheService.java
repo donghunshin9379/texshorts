@@ -40,7 +40,8 @@ public class RedisCacheService {
     public static final String POPULAR_POST_LIST_KEY_PREFIX = "post:popular:"; // 인기 피드
     private static final String VIEWED_USER_POST_PREFIX = "viewed:user:";
     private static final String VIEW_COUNT_PREFIX = "viewCount:";
-
+    private static final String USER_INTEREST_TAGS_PREFIX = "user:interest_tags:"; // 관심태그
+    
     private static final Logger logger = LoggerFactory.getLogger(RedisCacheService.class);
 
     // 기본 get: 문자열 반환
@@ -249,7 +250,7 @@ public class RedisCacheService {
 
 
     // 게시물 조회수 증가 (Redis 카운트 증가)
-    public Long incrementViewCount(Long postId) {
+    public Long  incrementViewCount(Long postId) {
         return increment(VIEW_COUNT_PREFIX + postId);
     }
 
@@ -310,5 +311,47 @@ public class RedisCacheService {
         String key = "feed:seen:" + userId;
         redisTemplate.delete(key);
     }
+
+
+    /** 관심태그 관련 =========================================*/
+
+    // 조회 (캐시 우선, 없으면 DB 조회 후 캐싱)
+    public Set<String> getUserInterestTags(Long userId, Supplier<Set<String>> dbLoader) {
+        String key = USER_INTEREST_TAGS_PREFIX + userId;
+        Set<String> cachedTags = redisTemplate.opsForSet().members(key);
+        if (cachedTags != null && !cachedTags.isEmpty()) {
+            return cachedTags;
+        }
+
+        // DB에서 로드
+        Set<String> dbTags = dbLoader.get();
+        if (dbTags != null && !dbTags.isEmpty()) {
+            redisTemplate.opsForSet().add(key, dbTags.toArray(new String[0]));
+            redisTemplate.expire(key, Duration.ofHours(6)); // TTL
+        }
+
+        return dbTags;
+    }
+
+
+    // 캐시에 단일 태그 추가
+    public void addUserInterestTagToCache(Long userId, String tag) {
+        String key = USER_INTEREST_TAGS_PREFIX + userId;
+        redisTemplate.opsForSet().add(key, tag);
+        redisTemplate.expire(key, Duration.ofHours(6)); // TTL 리셋
+    }
+
+    // 캐시에서 단일 태그 제거
+    public void removeUserInterestTagFromCache(Long userId, String tag) {
+        String key = USER_INTEREST_TAGS_PREFIX + userId;
+        redisTemplate.opsForSet().remove(key, tag);
+    }
+
+    // 캐시 전체 삭제
+    public void evictUserInterestTags(Long userId) {
+        String key = USER_INTEREST_TAGS_PREFIX + userId;
+        redisTemplate.delete(key);
+    }
+
 
 }

@@ -7,6 +7,7 @@ import com.example.texshorts.repository.CommentRepository;
 import com.example.texshorts.repository.PostRepository;
 import com.example.texshorts.repository.PostViewRepository;
 import com.example.texshorts.repository.ViewHistoryRepository;
+import com.example.texshorts.service.PostTagService;
 import com.example.texshorts.service.TagHubService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -22,7 +23,7 @@ public class PostDeletionService {
     private final PostRepository postRepository;
     private final CommentRepository commentRepository;
     private final ViewHistoryRepository viewHistoryRepository;
-    private final TagHubService tagHubService;
+    private final PostTagService postTagService;
     private final PostViewRepository postViewRepository;
 
     private static final Logger logger = LoggerFactory.getLogger(PostDeletionService.class);
@@ -33,7 +34,9 @@ public class PostDeletionService {
 
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new EntityNotFoundException("게시물이 없습니다."));
-        tagHubService.decreaseTagUsageFromPost(post);
+
+        // PostTag 관계 삭제 및 태그 사용량 감소
+        postTagService.unlinkPostAndTags(post);
 
         postRepository.deleteById(postId);
         postViewRepository.deleteByPostId(postId);

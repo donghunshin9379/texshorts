@@ -8,6 +8,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 @Component
@@ -37,19 +38,30 @@ public class RedisQueueWorker implements Runnable {
     private volatile boolean running = false;
     private Thread workerThread;
 
+    // 큐 종료용 리스트
+    private static final List<String> MONITORED_QUEUES = List.of(
+            CREATE_QUEUE,
+            DELETE_QUEUE,
+            USER_INTEREST_TAG_QUEUE,
+            LIKE_COUNT_UPDATE_QUEUE,
+            COMMENT_COUNT_UPDATE_QUEUE,
+            VIEW_COUNT_UPDATE_QUEUE,
+            POPULAR_FEED_UPDATE_QUEUE
+    );
+
     @Override
     public void run() {
         logger.info("RedisQueueWorker 스레드 시작");
         while (running) {
             try {
-                /** 게시물 생성 큐 처리 */
+                // 게시물 생성 큐 처리
                 Object messageObj = redisTemplate.opsForList().leftPop(CREATE_QUEUE, 1, TimeUnit.SECONDS);
                 if (messageObj instanceof PostCreationMessage msg) {
                     postCreationService.createPostFromMessage(msg);
                     continue;
                 }
 
-                /** 게시물 삭제 큐 처리 */
+                // 게시물 삭제 큐 처리
                 String postIdStr = (String) redisTemplate.opsForList().leftPop(DELETE_QUEUE, 1, TimeUnit.SECONDS);
                 if (postIdStr != null) {
                     Long postId = Long.parseLong(postIdStr);
@@ -57,7 +69,7 @@ public class RedisQueueWorker implements Runnable {
                     continue;
                 }
 
-                /** 좋아요 카운트 갱신 큐 처리 */
+                // 좋아요 카운트 갱신 큐 처리
                 String likeCountPostIdStr = (String) redisTemplate.opsForList().leftPop(LIKE_COUNT_UPDATE_QUEUE, 1, TimeUnit.SECONDS);
                 if (likeCountPostIdStr != null) {
                     Long postId = Long.parseLong(likeCountPostIdStr);
@@ -66,7 +78,7 @@ public class RedisQueueWorker implements Runnable {
                     continue;
                 }
 
-                /** 댓글 카운트 갱신 큐 처리 */
+                // 댓글 카운트 갱신 큐 처리
                 postIdStr = (String) redisTemplate.opsForList().leftPop(COMMENT_COUNT_UPDATE_QUEUE, 1, TimeUnit.SECONDS);
                 if (postIdStr != null) {
                     Long postId = Long.parseLong(postIdStr);
@@ -74,7 +86,7 @@ public class RedisQueueWorker implements Runnable {
                     continue;
                 }
 
-                /** 조회수 갱신 큐 처리 */
+                // 조회수 갱신 큐 처리
                 String viewCountPostIdStr = (String) redisTemplate.opsForList().leftPop(VIEW_COUNT_UPDATE_QUEUE, 1, TimeUnit.SECONDS);
                 if (viewCountPostIdStr != null) {
                     Long postId = Long.parseLong(viewCountPostIdStr);
@@ -82,14 +94,13 @@ public class RedisQueueWorker implements Runnable {
                     continue;
                 }
 
-                /** 관심태그 갱신 큐 처리 */
+                // 관심태그 갱신 큐 처리
                 Object msgObj = redisTemplate.opsForList().leftPop(USER_INTEREST_TAG_QUEUE, 1, TimeUnit.SECONDS);
                 if (msgObj instanceof Map<?, ?> map) {
                     Long userId = ((Number) map.get("userId")).longValue();
                     String tagName = (String) map.get("tagName");
                     String action = (String) map.get("action");
 
-                    /**ADD / REMOVE (갱신 OR 삭제) 현재는 REMOVE */
                     if ("add".equalsIgnoreCase(action)) {
                         userInterestTagService.addUserInterestTag(userId, tagName);
                         logger.info("UserInterestTag 추가 처리: userId={}, tagName={}", userId, tagName);
@@ -102,7 +113,7 @@ public class RedisQueueWorker implements Runnable {
                     continue;
                 }
 
-                /** 인기 피드 캐시 갱신 큐 처리 */
+                // 인기 피드 캐시 갱신 큐 처리
                 String popularFeedSignal = (String) redisTemplate.opsForList().leftPop(POPULAR_FEED_UPDATE_QUEUE, 1, TimeUnit.SECONDS);
                 if (popularFeedSignal != null) {
                     popularFeedRefresher.refreshPopularFeedCache();
@@ -110,19 +121,16 @@ public class RedisQueueWorker implements Runnable {
                     continue;
                 }
 
+                // 모든 큐 비어 있으면 종료
+                boolean allEmpty = MONITORED_QUEUES.stream()
+                        .allMatch(queue -> redisTemplate.opsForList().size(queue) == 0);
 
-
-                /** 큐 모두 비어있으면 종료 */
-                if (redisTemplate.opsForList().size(CREATE_QUEUE) == 0 &&
-                        redisTemplate.opsForList().size(DELETE_QUEUE) == 0 &&
-                        redisTemplate.opsForList().size(VIEW_COUNT_UPDATE_QUEUE) == 0 &&
-                        redisTemplate.opsForList().size(COMMENT_COUNT_UPDATE_QUEUE) == 0 &&
-                        redisTemplate.opsForList().size(USER_INTEREST_TAG_QUEUE) == 0 &&
-                        redisTemplate.opsForList().size(POPULAR_FEED_UPDATE_QUEUE) == 0) {
-                    logger.info("큐 비어 있음, RedisQueueWorker 종료");
+                if (allEmpty) {
+                    logger.info("모든 큐 비어 있음, RedisQueueWorker 종료");
                     running = false;
                     break;
                 }
+
             } catch (Exception e) {
                 logger.error("RedisQueueWorker 오류", e);
             }

@@ -6,6 +6,7 @@ import com.example.texshorts.entity.Post;
 import com.example.texshorts.entity.User;
 import com.example.texshorts.repository.PostRepository;
 import com.example.texshorts.repository.UserRepository;
+import com.example.texshorts.service.PostTagService;
 import com.example.texshorts.service.TagHubService;
 import com.example.texshorts.service.TagParserUtils;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +25,7 @@ public class PostCreationService {
     private final UserRepository userRepository;
     private final TagHubService tagHubService;
     private final TagParserUtils tagParserUtils;
+    private final PostTagService postTagService;
 
     private static final Logger logger = LoggerFactory.getLogger(PostCreationService.class);
     
@@ -51,8 +53,15 @@ public class PostCreationService {
                 .tags(tagsWithHash)
                 .build();
 
-        tagHubService.registerOrUpdateTagUsage(tagList);
         postRepository.save(post);
+
+
+        tagHubService.registerOrUpdateTagUsage(tagList);
+
+        // PostTag 저장
+        tagList.forEach(tag -> {
+            postTagService.linkPostAndTag(post, tag);
+        });
     }
 
 

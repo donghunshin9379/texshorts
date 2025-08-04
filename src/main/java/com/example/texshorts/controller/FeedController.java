@@ -21,7 +21,7 @@ public class FeedController {
     private final RedisCacheService redisCacheService;
 
     // 피드 게시물 요청( 타입별 분리)
-    @GetMapping("/feed")
+    @GetMapping("/get")
     public ResponseEntity<List<PostResponseDTO>> getFeed(
             @RequestParam("type") String type,
             @RequestParam("page") int page,
@@ -38,7 +38,7 @@ public class FeedController {
     }
 
     // 피드 게시물 노출 기록 저장 (실시간 중복 필터용 현재 TTL : 1일 )
-    /**서버입장 중복피드노출 방지*/
+    /**서버 입장 중복피드노출 방지 (캐시만 저장 DB X)*/
     @PostMapping("/seen")
     public ResponseEntity<Void> markPostAsSeen(
             @AuthenticationPrincipal CustomUserDetails userDetails,

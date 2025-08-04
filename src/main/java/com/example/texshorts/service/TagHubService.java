@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Optional;
 
+/**태그 등록 및 사용량 추적 서비스*/
 @Service
 @RequiredArgsConstructor
 public class TagHubService {
@@ -39,25 +40,25 @@ public class TagHubService {
         }
     }
 
-
-    // 태그 사용량 감소 처리
-    @Transactional
-    public void decreaseTagUsageFromPost(Post post) {
-        List<String> tagNames = tagParserUtils.parseTagsToList(post.getTags());  // 문자열 → 리스트 변환
-
-        for (String tagName : tagNames) {
-            Optional<TagHub> optionalTagHub = tagHubRepository.findByTagName(tagName);
-
-            if (optionalTagHub.isPresent()) {
-                TagHub tagHub = optionalTagHub.get();
-                tagHub.decrementUsageCount();
-
-                if (tagHub.getUsageCount() <= 0) { //음수 방지
-                    tagHubRepository.delete(tagHub);
-                }
-            }
-        }
-    }
+//
+//    // 태그 사용량 감소 처리
+//    @Transactional
+//    public void decreaseTagUsageFromPost(Post post) {
+//        List<String> tagNames = tagParserUtils.parseTagsToList(post.getTags());  // 문자열 → 리스트 변환
+//
+//        for (String tagName : tagNames) {
+//            Optional<TagHub> optionalTagHub = tagHubRepository.findByTagName(tagName);
+//
+//            if (optionalTagHub.isPresent()) {
+//                TagHub tagHub = optionalTagHub.get();
+//                tagHub.decrementUsageCount();
+//
+//                if (tagHub.getUsageCount() <= 0) { //음수 방지
+//                    tagHubRepository.delete(tagHub);
+//                }
+//            }
+//        }
+//    }
 
 
 

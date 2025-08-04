@@ -85,7 +85,7 @@ public class PostFeedService {
         return cached;
     }
 
-
+/**캐싱 고민..*/
     private List<PostResponseDTO> getPersonalizedPosts(int page, int size, Long userId) {
         // TODO: 유저의 관심 태그 기반 추천 로직
         // 예시: postRepository.findByTagsIn(userTags, pageable);

@@ -2,10 +2,8 @@ package com.example.texshorts.controller;
 
 import com.example.texshorts.dto.PostCreateRequest;
 import com.example.texshorts.custom.CustomUserDetails;
-import com.example.texshorts.dto.PostResponseDTO;
 import com.example.texshorts.service.PostFeedService;
 import com.example.texshorts.service.PostService;
-import com.example.texshorts.service.ViewService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;

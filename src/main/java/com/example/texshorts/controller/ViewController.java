@@ -22,7 +22,7 @@ public class ViewController {
     public ResponseEntity<Void> increaseViewCount(
             @RequestParam Long postId,
             @AuthenticationPrincipal CustomUserDetails customUserDetails) {
-        Long userId = customUserDetails.getUser().getId();
+        Long userId = customUserDetails.getUserId();
 
         viewService.increaseViewCountIfNotViewed(postId, userId);
         return ResponseEntity.ok().build();
