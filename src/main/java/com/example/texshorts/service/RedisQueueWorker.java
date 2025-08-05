@@ -2,6 +2,8 @@ package com.example.texshorts.service;
 
 import com.example.texshorts.component.*;
 import com.example.texshorts.dto.message.PostCreationMessage;
+import com.example.texshorts.dto.message.UserInterestTagQueueMessage;
+import com.example.texshorts.entity.TagActionType;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -96,22 +98,24 @@ public class RedisQueueWorker implements Runnable {
 
                 // 관심태그 갱신 큐 처리
                 Object msgObj = redisTemplate.opsForList().leftPop(USER_INTEREST_TAG_QUEUE, 1, TimeUnit.SECONDS);
-                if (msgObj instanceof Map<?, ?> map) {
-                    Long userId = ((Number) map.get("userId")).longValue();
-                    String tagName = (String) map.get("tagName");
-                    String action = (String) map.get("action");
 
-                    if ("add".equalsIgnoreCase(action)) {
-                        userInterestTagService.addUserInterestTag(userId, tagName);
-                        logger.info("UserInterestTag 추가 처리: userId={}, tagName={}", userId, tagName);
-                    } else if ("remove".equalsIgnoreCase(action)) {
-                        userInterestTagService.removeUserInterestTag(userId, tagName);
-                        logger.info("UserInterestTag 삭제 처리: userId={}, tagName={}", userId, tagName);
-                    } else {
-                        logger.warn("알 수 없는 action: {}", action);
+                if (msgObj instanceof UserInterestTagQueueMessage message) {
+                    Long userId = message.getUserId();
+                    String tagName = message.getTagName();
+                    TagActionType action = message.getAction();
+
+                    switch (action) {
+                        case ADD -> {
+                            userInterestTagService.addUserInterestTag(userId, tagName);
+                            logger.info("UserInterestTag 추가 처리: userId={}, tagName={}", userId, tagName);
+                        }
+                        case REMOVE -> {
+                            userInterestTagService.removeUserInterestTag(userId, tagName);
+                            logger.info("UserInterestTag 삭제 처리: userId={}, tagName={}", userId, tagName);
+                        }
                     }
-                    continue;
                 }
+
 
                 // 인기 피드 캐시 갱신 큐 처리
                 String popularFeedSignal = (String) redisTemplate.opsForList().leftPop(POPULAR_FEED_UPDATE_QUEUE, 1, TimeUnit.SECONDS);

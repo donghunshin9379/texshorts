@@ -55,18 +55,18 @@ public class RedisCacheService {
         }
     }
 
-    // JSON -> 객체 역직렬화 (단일 객체)
-    public <T> T getAs(String key, Class<T> clazz) {
-        String json = get(key);
-        if (json == null) return null;
-
-        try {
-            return objectMapper.readValue(json, clazz);
-        } catch (Exception e) {
-            logger.warn("Redis JSON 역직렬화 실패: {}", e.getMessage());
-            return null;
-        }
-    }
+//    // JSON -> 객체 역직렬화 (단일 객체)
+//    public <T> T getAs(String key, Class<T> clazz) {
+//        String json = get(key);
+//        if (json == null) return null;
+//
+//        try {
+//            return objectMapper.readValue(json, clazz);
+//        } catch (Exception e) {
+//            logger.warn("Redis JSON 역직렬화 실패: {}", e.getMessage());
+//            return null;
+//        }
+//    }
 
     // 역직렬화
     // class기반

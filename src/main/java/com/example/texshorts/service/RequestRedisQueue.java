@@ -1,6 +1,8 @@
 package com.example.texshorts.service;
 
 import com.example.texshorts.dto.message.PostCreationMessage;
+import com.example.texshorts.dto.message.UserInterestTagQueueMessage;
+import com.example.texshorts.entity.TagActionType;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -60,15 +62,10 @@ public class RequestRedisQueue {
     }
 
     // 관심태그 갱신 큐 요청 (관심태그 생성 / 삭제)
-    public void enqueueUserInterestTagUpdate(Long userId, String tagName, String action) {
-        //DTO 대신 Map 활용
-        Map<String, Object> message = new HashMap<>();
-        message.put("userId", userId);
-        message.put("tagName", tagName);
-        message.put("action", action);
-
+    public void enqueueUserInterestTagUpdate(Long userId, String tagName, TagActionType action) {
+        UserInterestTagQueueMessage message = new UserInterestTagQueueMessage(userId, tagName, action);
         redisTemplate.opsForList().rightPush(USER_INTEREST_TAG_QUEUE, message);
-        logger.info("UserInterestTag 큐 요청: userId={}, tagName={}, action={}", userId, tagName, action);
+        logger.info("큐에 등록: {}", message);
 
         redisQueueWorker.trigger();
     }

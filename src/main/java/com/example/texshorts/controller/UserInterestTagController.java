@@ -1,6 +1,7 @@
 package com.example.texshorts.controller;
 
 import com.example.texshorts.custom.CustomUserDetails;
+import com.example.texshorts.entity.TagActionType;
 import com.example.texshorts.service.RequestRedisQueue;
 import com.example.texshorts.service.UserInterestTagService;
 import lombok.RequiredArgsConstructor;
@@ -29,13 +30,16 @@ public class UserInterestTagController {
 
     @PostMapping("/add")
     public ResponseEntity<String> addInterestTag(@AuthenticationPrincipal CustomUserDetails userDetails, @RequestParam String tagName) {
-        requestRedisQueue.enqueueUserInterestTagUpdate(userDetails.getUserId(), tagName, "add");
+        Long userId = userDetails.getUserId();
+        requestRedisQueue.enqueueUserInterestTagUpdate(userId, tagName, TagActionType.ADD);
+
         return ResponseEntity.ok("관심태그 추가 요청이 큐에 저장되었습니다.");
     }
 
     @PostMapping("/remove") /**갱신하기 OR 삭제 + 생성하기 고민 */
     public ResponseEntity<String> removeInterestTag(@AuthenticationPrincipal CustomUserDetails userDetails, @RequestParam String tagName) {
-        requestRedisQueue.enqueueUserInterestTagUpdate(userDetails.getUserId(), tagName, "remove");
+        Long userId = userDetails.getUserId();
+        requestRedisQueue.enqueueUserInterestTagUpdate(userId, tagName, TagActionType.REMOVE);
         return ResponseEntity.ok("관심태그 삭제 요청이 큐에 저장되었습니다.");
     }
 
