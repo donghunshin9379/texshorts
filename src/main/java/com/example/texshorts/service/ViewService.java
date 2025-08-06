@@ -1,5 +1,6 @@
 package com.example.texshorts.service;
 
+import com.example.texshorts.entity.TagActionType;
 import com.example.texshorts.entity.ViewHistory;
 import com.example.texshorts.repository.PostRepository;
 import com.example.texshorts.repository.ViewHistoryRepository;
@@ -10,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -23,28 +25,41 @@ public class ViewService {
 
     @Transactional
     public void increaseViewCountIfNotViewed(Long postId, Long userId) {
-
-        /** 중복시청 방지 */
-        if (redisCacheService.hasViewed(userId, postId)) { /**캐시에 조회기록 있을시 실행 X*/
+        if (redisCacheService.hasViewed(userId, postId)) {
             logger.info("중복시청 if 필터 걸림! userId : {}", userId);
             logger.info("중복시청 if 필터 걸림! postId : {}", postId);
             return;
         }
-        /** 게시물 조회수 증가 (캐시) */
+
         redisCacheService.incrementViewCount(postId);
 
-        /** 유저 조회 기록 저장 (DB) #태그 추출용# */
-        viewHistoryRepository.save(
-                new ViewHistory(userId, postRepository.getReferenceById(postId), LocalDateTime.now())
-        );
+        requestRedisQueue.enqueueViewHistorySave(userId, postId);
 
-        /** 유저 기록 저장 (캐시) */
         redisCacheService.cacheViewHistory(userId, postId);
-
 
         requestRedisQueue.enqueueViewCountUpdate(postId);
 
     }
+
+
+    /**
+     * 여러 태그에 대해 관심태그 갱신 요청을 큐에 한꺼번에 등록
+     */
+    public void enqueueAddInterestTagsFromPost(Long userId, Long postId) {
+        List<String> tagNames = postRepository.findTagNamesByPostId(postId); // 구체적 구현
+        for (String tag : tagNames) {
+            requestRedisQueue.enqueueUserInterestTagUpdate(userId, tag, TagActionType.ADD);
+        }
+    }
+
+//    public void enqueueRemoveInterestTagsFromPost(Long userId, Long postId) {
+//        List<String> tagNames = postRepository.findTagNamesByPostId(postId); // 구체적 구현
+//        for (String tag : tagNames) {
+//            requestRedisQueue.enqueueUserInterestTagUpdate(userId, tag, TagActionType.REMOVE);
+//        }
+//    }
+
+
 
 
 

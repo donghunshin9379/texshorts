@@ -22,6 +22,7 @@ public class CommentService {
     private final PostRepository postRepository;
     private final RedisCacheService redisCacheService;
     private final RequestRedisQueue requestRedisQueue;
+    private final ViewService viewService;
 
     private static final Logger logger = LoggerFactory.getLogger(CommentService.class);
 
@@ -59,20 +60,21 @@ public class CommentService {
     }
 
     /** 댓글 생성 and Count 업데이트( 캐싱 > 큐 ) */
-    public Comment createRootComment(Long postId, User userId, String content) {
+    public Comment createRootComment(Long postId, User user, String content) {
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 게시물입니다."));
 
-        Comment comment = Comment.createRootComment(post, userId, content);
+        Comment comment = Comment.createRootComment(post, user, content);
         Comment saved = commentRepository.save(comment);
 
         redisCacheService.incrementRootCommentCount(postId);
         requestRedisQueue.enqueueCommentCountUpdate(postId);
+
         return saved;
     }
 
     /** 답글 생성 and Count 업데이트( 캐싱 > 큐 ) */
-    public Comment createReply(Long parentCommentId, User userId, String content) {
+    public Comment createReply(Long parentCommentId, User user, String content) {
         Comment parent = commentRepository.findById(parentCommentId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 댓글입니다."));
 
@@ -80,10 +82,12 @@ public class CommentService {
             throw new IllegalArgumentException("답글에는 답글을 달 수 없습니다.");
         }
 
-        Comment reply = Comment.createReply(parent, userId, content);
+        Comment reply = Comment.createReply(parent, user, content);
         Comment saved = commentRepository.save(reply);
 
         redisCacheService.incrementReplyCount(parentCommentId);
+
+
         return saved;
     }
 

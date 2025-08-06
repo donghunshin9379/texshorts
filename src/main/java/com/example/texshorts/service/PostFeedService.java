@@ -24,6 +24,7 @@ public class PostFeedService {
 
     private final PostRepository postRepository;
     private final RedisCacheService redisCacheService;
+    private final UserInterestTagService userInterestTagService;
     private static final Logger logger = LoggerFactory.getLogger(PostFeedService.class);
 
     /** 피드 종류
@@ -85,12 +86,48 @@ public class PostFeedService {
         return cached;
     }
 
-/**캐싱 고민..*/
+    /** 개인화 게시물 피드 */
     private List<PostResponseDTO> getPersonalizedPosts(int page, int size, Long userId) {
-        // TODO: 유저의 관심 태그 기반 추천 로직
-        // 예시: postRepository.findByTagsIn(userTags, pageable);
-        return new ArrayList<>();
+        //로그인상태 아닐때 인기피드 대체
+        if (userId == null) return getPopularPosts(page, size, null);
+
+        //관심태그 조회 (관심태그 없을시 인기피드 대체)
+        List<String> interestTags = userInterestTagService.getUserInterestTags(userId);
+        if (interestTags.isEmpty()) return getPopularPosts(page, size, userId);
+
+        // 관심태그 기반 Post조회 (중복X)
+        Pageable pageable = PageRequest.of(0, size);
+        List<Post> personalizedPosts = postRepository.findDistinctPostsByTagNames(interestTags, pageable);
+
+        // 최종 개인화 post 부족시 > 인기피드 추가
+        personalizedPosts = fillWithPopularPostsIfInsufficient(personalizedPosts, size);
+
+        List<PostResponseDTO> dtos = personalizedPosts.stream()
+                .map(this::toDto)
+                .collect(Collectors.toList());
+
+        return filterSeenPosts(dtos, userId);
     }
+
+
+    /** 개인화 피드 부족 시 인기글 보충 */
+    private List<Post> fillWithPopularPostsIfInsufficient(List<Post> posts, int size) {
+        if (posts.size() >= size) return posts;
+
+        int shortage = size - posts.size();
+        Pageable pageable = PageRequest.of(0, shortage, Sort.by(Sort.Direction.DESC, "viewCount"));
+        List<Post> fallback = postRepository.findAll(pageable).getContent();
+
+        Set<Long> existingIds = posts.stream().map(Post::getId).collect(Collectors.toSet());
+        List<Post> additional = fallback.stream()
+                .filter(post -> !existingIds.contains(post.getId()))
+                .collect(Collectors.toList());
+
+        List<Post> result = new ArrayList<>(posts);
+        result.addAll(additional);
+        return result;
+    }
+
 
 
     /** 노출 피드 중복방지 필터링 */

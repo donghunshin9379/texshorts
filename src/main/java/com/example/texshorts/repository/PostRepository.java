@@ -11,6 +11,8 @@ import org.springframework.stereotype.Repository;
 
 import org.springframework.data.domain.Pageable;
 
+import java.util.List;
+
 
 @Repository
 public interface PostRepository extends JpaRepository<Post, Long> {
@@ -30,8 +32,21 @@ public interface PostRepository extends JpaRepository<Post, Long> {
     @Query("UPDATE Post p SET p.viewCount = :count WHERE p.id = :postId")
     void updateViewCount(@Param("postId") Long postId, @Param("count") int count);
 
+    // Post 테이블 > PostTag > TagHub > tagname 추출
+    @Query("SELECT th.tagName FROM Post p " +
+            "JOIN p.postTags pt " +
+            "JOIN pt.tagHub th " +
+            "WHERE p.id = :postId")
+    List<String> findTagNamesByPostId(@Param("postId") Long postId);
 
-
+    // 특정(관심)태그 기반 검색
+    @Query("""
+    SELECT DISTINCT pt.post FROM PostTag pt
+    JOIN pt.tagHub th
+    WHERE th.tagName IN :tagNames
+    ORDER BY pt.post.createdAt DESC
+    """)
+    List<Post> findDistinctPostsByTagNames(@Param("tagNames") List<String> tagNames, Pageable pageable);
 
 
 

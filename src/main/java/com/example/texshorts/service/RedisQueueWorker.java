@@ -3,6 +3,7 @@ package com.example.texshorts.service;
 import com.example.texshorts.component.*;
 import com.example.texshorts.dto.message.PostCreationMessage;
 import com.example.texshorts.dto.message.UserInterestTagQueueMessage;
+import com.example.texshorts.dto.message.ViewHistorySaveMessage;
 import com.example.texshorts.entity.TagActionType;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -11,7 +12,6 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.TimeUnit;
 @Component
 @RequiredArgsConstructor
@@ -25,6 +25,7 @@ public class RedisQueueWorker implements Runnable {
     private final ViewCountFlusher viewCountFlusher;
     private final PopularFeedRefresher popularFeedRefresher;
     private final ReactionCountFlusher reactionCountFlusher;
+    private final ViewHistoryWorker viewHistoryWorker;
 
     private static final String CREATE_QUEUE = "create:post:queue";
     private static final String DELETE_QUEUE = "delete:post:queue";
@@ -33,6 +34,7 @@ public class RedisQueueWorker implements Runnable {
     private static final String COMMENT_COUNT_UPDATE_QUEUE = "update:commentCount:queue";
     private static final String VIEW_COUNT_UPDATE_QUEUE = "update:viewCount:queue";
     private static final String POPULAR_FEED_UPDATE_QUEUE = "update:popularFeed:queue";
+    private static final String VIEW_HISTORY_SAVE_QUEUE = "update:viewHistorySave:queue";
 
 
     private static final Logger logger = LoggerFactory.getLogger(RedisQueueWorker.class);
@@ -48,7 +50,8 @@ public class RedisQueueWorker implements Runnable {
             LIKE_COUNT_UPDATE_QUEUE,
             COMMENT_COUNT_UPDATE_QUEUE,
             VIEW_COUNT_UPDATE_QUEUE,
-            POPULAR_FEED_UPDATE_QUEUE
+            POPULAR_FEED_UPDATE_QUEUE,
+            VIEW_HISTORY_SAVE_QUEUE
     );
 
     @Override
@@ -116,12 +119,23 @@ public class RedisQueueWorker implements Runnable {
                     }
                 }
 
-
                 // 인기 피드 캐시 갱신 큐 처리
                 String popularFeedSignal = (String) redisTemplate.opsForList().leftPop(POPULAR_FEED_UPDATE_QUEUE, 1, TimeUnit.SECONDS);
                 if (popularFeedSignal != null) {
                     popularFeedRefresher.refreshPopularFeedCache();
                     logger.info("인기 피드 캐시 갱신 완료");
+                    continue;
+                }
+
+                // 조회 기록 저장 큐 처리
+                Object viewHistoryMsgObj = redisTemplate.opsForList().leftPop(VIEW_HISTORY_SAVE_QUEUE, 1, TimeUnit.SECONDS);
+                if (viewHistoryMsgObj instanceof ViewHistorySaveMessage viewHistoryMsg) {
+                    Long userId = viewHistoryMsg.getUserId();
+                    Long postId = viewHistoryMsg.getPostId();
+
+                    viewHistoryWorker.saveViewHistory(userId, postId);
+
+                    logger.info("ViewHistory 저장 처리 완료: userId={}, postId={}", userId, postId);
                     continue;
                 }
 

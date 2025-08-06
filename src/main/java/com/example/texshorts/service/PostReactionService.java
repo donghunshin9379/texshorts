@@ -23,6 +23,7 @@ public class PostReactionService {
     private final PostReactionRepository postReactionRepository;
     private final RedisCacheService redisCacheService;
     private final RequestRedisQueue requestRedisQueue;
+    private final ViewService viewService;
 
     private final Logger logger = LoggerFactory.getLogger(PostReactionService.class);
 
@@ -49,10 +50,10 @@ public class PostReactionService {
     private void deleteReaction(PostReaction reaction, Long postId, ReactionType type) {
         logger.info("deleteReaction 호출됨");
         postReactionRepository.deleteById(reaction.getId());
+        postReactionRepository.flush(); // <- ★ 여기 추가!
 
         redisCacheService.decrementPostReactionCount(postId, type);
 
-        // 좋아요 수 감소 시, likeCount DB 반영 요청 큐에 추가
         if (type == ReactionType.LIKE) {
             requestRedisQueue.enqueueLikeCountUpdate(postId);
         }
@@ -71,6 +72,10 @@ public class PostReactionService {
         if (type == ReactionType.LIKE) {
             requestRedisQueue.enqueueLikeCountUpdate(postId);
         }
+        // 시청기록, 관심태그 처리
+        viewService.increaseViewCountIfNotViewed(postId, user.getId());
+        logger.info("PostReaction 기반 시청 기록 저장: userId={}, postId={}, type={}", user.getId(), postId, type);
+
     }
 
     public Long getLikeCount(Long postId) {

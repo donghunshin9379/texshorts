@@ -20,6 +20,8 @@ public interface ViewHistoryRepository extends JpaRepository<ViewHistory, Long> 
     @Query("SELECT v FROM ViewHistory v WHERE v.post.id = :postId")
     List<ViewHistory> findTopNByPostId(@Param("postId") Long postId, Pageable pageable);
 
+    // 중복 기록 방지
+    boolean existsByUserIdAndPostId(Long userId, Long postId);
 
 
 }

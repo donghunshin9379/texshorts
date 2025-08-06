@@ -2,6 +2,7 @@ package com.example.texshorts.service;
 
 import com.example.texshorts.dto.message.PostCreationMessage;
 import com.example.texshorts.dto.message.UserInterestTagQueueMessage;
+import com.example.texshorts.dto.message.ViewHistorySaveMessage;
 import com.example.texshorts.entity.TagActionType;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -9,8 +10,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
-import java.util.HashMap;
-import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -25,6 +24,7 @@ public class RequestRedisQueue {
     private static final String COMMENT_COUNT_UPDATE_QUEUE = "update:commentCount:queue";
     private static final String VIEW_COUNT_UPDATE_QUEUE = "update:viewCount:queue";
     private static final String USER_INTEREST_TAG_QUEUE = "update:userInterestTag:queue";
+    private static final String VIEW_HISTORY_SAVE_QUEUE = "save:viewHistory:queue";
 
     private static final Logger logger = LoggerFactory.getLogger(RequestRedisQueue.class);
 
@@ -32,7 +32,6 @@ public class RequestRedisQueue {
     // 게시물 생성 큐 요청
     public void enqueuePostCreation(PostCreationMessage msg) {
         redisTemplate.opsForList().rightPush(CREATE_QUEUE, msg);
-        logger.info(" 게시물 생성 큐 요청 : {}",msg );
         redisQueueWorker.trigger();
     }
 
@@ -57,7 +56,6 @@ public class RequestRedisQueue {
     // 좋아요 수 갱신 큐 요청
     public void enqueueLikeCountUpdate(Long postId) {
         redisTemplate.opsForList().rightPush(LIKE_COUNT_UPDATE_QUEUE, String.valueOf(postId));
-        logger.info("좋아요 수 갱신 큐 요청: postId={}", postId);
         redisQueueWorker.trigger();
     }
 
@@ -65,7 +63,6 @@ public class RequestRedisQueue {
     public void enqueueUserInterestTagUpdate(Long userId, String tagName, TagActionType action) {
         UserInterestTagQueueMessage message = new UserInterestTagQueueMessage(userId, tagName, action);
         redisTemplate.opsForList().rightPush(USER_INTEREST_TAG_QUEUE, message);
-        logger.info("큐에 등록: {}", message);
 
         redisQueueWorker.trigger();
     }
@@ -76,6 +73,12 @@ public class RequestRedisQueue {
         redisQueueWorker.trigger();
     }
 
+    public void enqueueViewHistorySave(Long userId, Long postId) {
+        ViewHistorySaveMessage msg = new ViewHistorySaveMessage(userId, postId);
+        redisTemplate.opsForList().rightPush(VIEW_HISTORY_SAVE_QUEUE, msg);
+        logger.info("조회 기록 저장 큐 요청: userId={}, postId={}", userId, postId);
+        redisQueueWorker.trigger();
+    }
 
 }
 

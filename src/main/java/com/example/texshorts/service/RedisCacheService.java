@@ -333,7 +333,6 @@ public class RedisCacheService {
         return dbTags;
     }
 
-
     // 캐시에 단일 태그 추가
     public void addUserInterestTagToCache(Long userId, String tag) {
         String key = USER_INTEREST_TAGS_PREFIX + userId;

@@ -57,6 +57,7 @@ public class CommentReactionService {
 
         commentRepository.save(comment); // 변경사항 DB 반영
         redisCacheService.incrementPostReactionCount(commentId, type);
+
     }
 
     private void deleteReaction(CommentReaction reaction, Long commentId, ReactionType type) {
