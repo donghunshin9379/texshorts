@@ -86,7 +86,7 @@ public class PostFeedService {
         return cached;
     }
 
-    /** 개인화 게시물 피드 */
+    /** 개인화 게시물 피드 */ //관심태그 조회 캐시로
     private List<PostResponseDTO> getPersonalizedPosts(int page, int size, Long userId) {
         //로그인상태 아닐때 인기피드 대체
         if (userId == null) return getPopularPosts(page, size, null);

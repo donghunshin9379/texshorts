@@ -5,6 +5,7 @@ import com.example.texshorts.dto.message.PostCreationMessage;
 import com.example.texshorts.dto.message.UserInterestTagQueueMessage;
 import com.example.texshorts.dto.message.ViewHistorySaveMessage;
 import com.example.texshorts.entity.TagActionType;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,7 +21,7 @@ public class RedisQueueWorker implements Runnable {
     private final RedisTemplate<String, Object> redisTemplate;
     private final PostCreationService postCreationService;
     private final PostDeletionService postDeletionService;
-    private final UserInterestTagService userInterestTagService;
+    private final UserInterestTagWorker userInterestTagWorker;
     private final CommentCountFlusher commentCountFlusher;
     private final ViewCountFlusher viewCountFlusher;
     private final PopularFeedRefresher popularFeedRefresher;
@@ -109,11 +110,11 @@ public class RedisQueueWorker implements Runnable {
 
                     switch (action) {
                         case ADD -> {
-                            userInterestTagService.addUserInterestTag(userId, tagName);
+                            userInterestTagWorker.addUserInterestTag(userId, tagName);
                             logger.info("UserInterestTag 추가 처리: userId={}, tagName={}", userId, tagName);
                         }
                         case REMOVE -> {
-                            userInterestTagService.removeUserInterestTag(userId, tagName);
+                            userInterestTagWorker.removeUserInterestTag(userId, tagName);
                             logger.info("UserInterestTag 삭제 처리: userId={}, tagName={}", userId, tagName);
                         }
                     }
@@ -127,17 +128,23 @@ public class RedisQueueWorker implements Runnable {
                     continue;
                 }
 
-                // 조회 기록 저장 큐 처리
-                Object viewHistoryMsgObj = redisTemplate.opsForList().leftPop(VIEW_HISTORY_SAVE_QUEUE, 1, TimeUnit.SECONDS);
-                if (viewHistoryMsgObj instanceof ViewHistorySaveMessage viewHistoryMsg) {
-                    Long userId = viewHistoryMsg.getUserId();
-                    Long postId = viewHistoryMsg.getPostId();
+                Object obj = redisTemplate.opsForList().leftPop(VIEW_HISTORY_SAVE_QUEUE, 1, TimeUnit.SECONDS);
+                if (obj instanceof String jsonStr) {
+                    try {
+                        ObjectMapper objectMapper = new ObjectMapper();
+                        ViewHistorySaveMessage viewHistoryMsg = objectMapper.readValue(jsonStr, ViewHistorySaveMessage.class);
 
-                    viewHistoryWorker.saveViewHistory(userId, postId);
+                        Long userId = viewHistoryMsg.getUserId();
+                        Long postId = viewHistoryMsg.getPostId();
 
-                    logger.info("ViewHistory 저장 처리 완료: userId={}, postId={}", userId, postId);
-                    continue;
+                        viewHistoryWorker.saveViewHistory(userId, postId);
+                        logger.info("ViewHistory 저장 처리 완료: userId={}, postId={}", userId, postId);
+
+                    } catch (Exception e) {
+                        logger.error("조회 기록 역직렬화 실패", e);
+                    }
                 }
+
 
                 // 모든 큐 비어 있으면 종료
                 boolean allEmpty = MONITORED_QUEUES.stream()

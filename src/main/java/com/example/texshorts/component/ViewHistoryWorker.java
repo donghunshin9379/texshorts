@@ -1,10 +1,8 @@
 package com.example.texshorts.component;
 
-import com.example.texshorts.dto.message.ViewHistorySaveMessage;
 import com.example.texshorts.entity.ViewHistory;
 import com.example.texshorts.repository.PostRepository;
 import com.example.texshorts.repository.ViewHistoryRepository;
-import com.example.texshorts.service.ViewService;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,6 +17,8 @@ public class ViewHistoryWorker {
 
     private final ViewHistoryRepository viewHistoryRepository;
     private final PostRepository postRepository;
+
+
     private final Logger logger = LoggerFactory.getLogger(ViewHistoryWorker.class);
 
     @Transactional
@@ -36,5 +36,7 @@ public class ViewHistoryWorker {
 
         viewHistoryRepository.save(vh);
         logger.info("조회 기록 저장 완료 - userId: {}, postId: {}", userId, postId);
+
     }
+
 }

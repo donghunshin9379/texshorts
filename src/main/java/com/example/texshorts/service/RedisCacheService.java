@@ -4,6 +4,7 @@ import com.example.texshorts.dto.CommentResponseDTO;
 import com.example.texshorts.dto.PostResponseDTO;
 import com.example.texshorts.entity.ReactionType;
 import com.example.texshorts.repository.CommentRepository;
+import com.example.texshorts.repository.PostRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -25,12 +26,14 @@ public class RedisCacheService {
     private final RedisTemplate<String, String> redisTemplate;
     private final CommentRepository commentRepository;
     private final ObjectMapper objectMapper;
+    private final PostRepository postRepository;
 
     private static final Duration DEFAULT_TTL = Duration.ofMinutes(30);
     private static final Duration VIEWED_POST_TTL = Duration.ofHours(1);
     /**게시물 피드(캐시) 갱신 주기*/
     public static final Duration POST_LIST_TTL = Duration.ofMinutes(10);
-    
+    private static final Duration TAG_NAMES_TTL = Duration.ofHours(1);
+
     private static final String COMMENT_LIST_KEY_PREFIX = "post:comments:";
     private static final String COMMENT_COUNT_KEY_PREFIX = "post:commentCount:";
     private static final String REPLY_LIST_KEY_PREFIX = "comment:replies:";
@@ -41,6 +44,7 @@ public class RedisCacheService {
     private static final String VIEWED_USER_POST_PREFIX = "viewed:user:";
     private static final String VIEW_COUNT_PREFIX = "viewCount:";
     private static final String USER_INTEREST_TAGS_PREFIX = "user:interest_tags:"; // 관심태그
+    private static final String POST_TAG_NAMES_KEY_PREFIX = "post:tags:";
     
     private static final Logger logger = LoggerFactory.getLogger(RedisCacheService.class);
 
@@ -54,19 +58,6 @@ public class RedisCacheService {
             return null;
         }
     }
-
-//    // JSON -> 객체 역직렬화 (단일 객체)
-//    public <T> T getAs(String key, Class<T> clazz) {
-//        String json = get(key);
-//        if (json == null) return null;
-//
-//        try {
-//            return objectMapper.readValue(json, clazz);
-//        } catch (Exception e) {
-//            logger.warn("Redis JSON 역직렬화 실패: {}", e.getMessage());
-//            return null;
-//        }
-//    }
 
     // 역직렬화
     // class기반
@@ -155,11 +146,18 @@ public class RedisCacheService {
     }
 
     public void incrementRootCommentCount(Long postId) {
-        increment(COMMENT_COUNT_KEY_PREFIX + postId);
+        String key = COMMENT_COUNT_KEY_PREFIX + postId;
+        increment(key);
+        // 증감 후 TTL 갱신 (30분)
+        redisTemplate.expire(key, DEFAULT_TTL);
     }
 
+    // 예시: 댓글 수 증감 후 TTL 갱신을 추가한 decrementRootCommentCount 메서드
     public void decrementRootCommentCount(Long postId) {
-        decrement(COMMENT_COUNT_KEY_PREFIX + postId);
+        String key = COMMENT_COUNT_KEY_PREFIX + postId;
+        decrement(key);
+        // 증감 후 TTL 갱신 (30분)
+        redisTemplate.expire(key, DEFAULT_TTL);
     }
 
     // === 답글 수 관련 ===
@@ -179,11 +177,15 @@ public class RedisCacheService {
     }
 
     public void incrementReplyCount(Long parentCommentId) {
-        increment(REPLY_COUNT_KEY_PREFIX + parentCommentId);
+        String key = REPLY_COUNT_KEY_PREFIX + parentCommentId;
+        increment(key);
+        redisTemplate.expire(key, DEFAULT_TTL);
     }
 
     public void decrementReplyCount(Long parentCommentId) {
-        decrement(REPLY_COUNT_KEY_PREFIX + parentCommentId);
+        String key = REPLY_COUNT_KEY_PREFIX + parentCommentId;
+        decrement(key);
+        redisTemplate.expire(key, DEFAULT_TTL);
     }
 
     // === 댓글 목록 캐싱 ===
@@ -192,7 +194,7 @@ public class RedisCacheService {
     }
 
     public void cacheRootComments(Long postId, List<CommentResponseDTO> comments) {
-        setAs(COMMENT_LIST_KEY_PREFIX + postId, comments);
+        setAs(COMMENT_LIST_KEY_PREFIX + postId, comments, DEFAULT_TTL);
     }
 
     public void evictRootCommentList(Long postId) {
@@ -205,7 +207,7 @@ public class RedisCacheService {
     }
 
     public void cacheReplies(Long parentCommentId, List<CommentResponseDTO> replies) {
-        setAs(REPLY_LIST_KEY_PREFIX + parentCommentId, replies);
+        setAs(REPLY_LIST_KEY_PREFIX + parentCommentId, replies, DEFAULT_TTL);
     }
 
     public void evictReplyList(Long parentCommentId) {
@@ -233,11 +235,15 @@ public class RedisCacheService {
     }
 
     public void incrementPostReactionCount(Long postId, ReactionType type) {
-        increment(getPostReactionKey(postId, type));
+        String key = getPostReactionKey(postId, type);
+        increment(key);
+        redisTemplate.expire(key, DEFAULT_TTL);
     }
 
     public void decrementPostReactionCount(Long postId, ReactionType type) {
-        decrement(getPostReactionKey(postId, type));
+        String key = getPostReactionKey(postId, type);
+        decrement(key);
+        redisTemplate.expire(key, DEFAULT_TTL);
     }
 
 
@@ -250,8 +256,11 @@ public class RedisCacheService {
 
 
     // 게시물 조회수 증가 (Redis 카운트 증가)
-    public Long  incrementViewCount(Long postId) {
-        return increment(VIEW_COUNT_PREFIX + postId);
+    public Long incrementViewCount(Long postId) {
+        String key = VIEW_COUNT_PREFIX + postId;
+        Long val = increment(key);
+        redisTemplate.expire(key, DEFAULT_TTL);
+        return val;
     }
 
     // 유저-게시물 조회 이력 (조회수 중복 증가 방지)
@@ -315,7 +324,7 @@ public class RedisCacheService {
 
     /** 관심태그 관련 =========================================*/
 
-    // 조회 (캐시 우선, 없으면 DB 조회 후 캐싱)
+    // 유저 관심태그 조회 (캐시 우선, 없으면 DB 조회 후 캐싱)
     public Set<String> getUserInterestTags(Long userId, Supplier<Set<String>> dbLoader) {
         String key = USER_INTEREST_TAGS_PREFIX + userId;
         Set<String> cachedTags = redisTemplate.opsForSet().members(key);
@@ -349,6 +358,38 @@ public class RedisCacheService {
     // 캐시 전체 삭제
     public void evictUserInterestTags(Long userId) {
         String key = USER_INTEREST_TAGS_PREFIX + userId;
+        redisTemplate.delete(key);
+    }
+    
+    /** postId 기준 태그네임 캐시 관련 ========================================*/
+    // 태그 목록 캐싱용 get
+    public List<String> getTagNamesByPostId(Long postId) {
+        String key = POST_TAG_NAMES_KEY_PREFIX + postId;
+
+        String cachedJson = redisTemplate.opsForValue().get(key);
+        if (cachedJson != null) {
+            try {
+                return objectMapper.readValue(cachedJson, new TypeReference<List<String>>() {});
+            } catch (JsonProcessingException e) {
+                // 역직렬화 실패 시 로그 기록 후 캐시 삭제
+                redisTemplate.delete(key);
+            }
+        }
+
+        // 캐시 없거나 역직렬화 실패 시 DB 조회 후 캐싱
+        List<String> tagNames = postRepository.findTagNamesByPostId(postId);
+        try {
+            String json = objectMapper.writeValueAsString(tagNames);
+            redisTemplate.opsForValue().set(key, json, TAG_NAMES_TTL);
+        } catch (JsonProcessingException e) {
+            // 직렬화 실패 시 로그만 남기고 무시
+        }
+        return tagNames;
+    }
+
+    // 필요시 캐시 삭제용 메서드도 추가
+    public void evictTagNamesCache(Long postId) {
+        String key = POST_TAG_NAMES_KEY_PREFIX + postId;
         redisTemplate.delete(key);
     }
 

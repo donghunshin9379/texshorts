@@ -50,7 +50,7 @@ public class PostReactionService {
     private void deleteReaction(PostReaction reaction, Long postId, ReactionType type) {
         logger.info("deleteReaction 호출됨");
         postReactionRepository.deleteById(reaction.getId());
-        postReactionRepository.flush(); // <- ★ 여기 추가!
+        postReactionRepository.flush();
 
         redisCacheService.decrementPostReactionCount(postId, type);
 
