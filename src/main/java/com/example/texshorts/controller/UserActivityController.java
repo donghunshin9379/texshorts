@@ -28,8 +28,7 @@ public class UserActivityController { /**유저 활동 트리거 */
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         Long userId = userDetails.getUserId();
 
-        viewService.increaseViewCountIfNotViewed(postId, userDetails.getUserId());
-        logger.info("LongView 기반 시청 기록 저장: userId={}, postId={}", userId, postId);
+        viewService.increaseViewCountIfNotViewed(postId, userId);
         return ResponseEntity.ok().build();
     }
 

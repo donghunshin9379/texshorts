@@ -1,16 +1,9 @@
 package com.example.texshorts.service;
 
-import com.example.texshorts.entity.TagActionType;
-import com.example.texshorts.entity.TagHub;
-import com.example.texshorts.entity.User;
-import com.example.texshorts.entity.UserInterestTag;
-import com.example.texshorts.repository.PostRepository;
-import com.example.texshorts.repository.TagHubRepository;
+
 import com.example.texshorts.repository.UserInterestTagRepository;
-import com.example.texshorts.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Set;

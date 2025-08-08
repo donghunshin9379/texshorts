@@ -42,6 +42,7 @@ public class RedisCacheService {
     public static final String LATEST_POST_LIST_KEY_PREFIX = "post:latest:";         // 최신 피드
     public static final String POPULAR_POST_LIST_KEY_PREFIX = "post:popular:"; // 인기 피드
     private static final String VIEWED_USER_POST_PREFIX = "viewed:user:";
+    public static final String PERSONALIZED_POST_LIST_KEY_PREFIX = "feed:personalized:"; // 개인화 피드
     private static final String VIEW_COUNT_PREFIX = "viewCount:";
     private static final String USER_INTEREST_TAGS_PREFIX = "user:interest_tags:"; // 관심태그
     private static final String POST_TAG_NAMES_KEY_PREFIX = "post:tags:";
@@ -251,9 +252,26 @@ public class RedisCacheService {
     // 게시물 조회 여부
     public boolean hasViewed(Long userId, Long postId) {
         String key = VIEWED_USER_POST_PREFIX + userId + ":posts";
-        return redisTemplate.opsForSet().isMember(key, postId.toString());
+        boolean isMember = redisTemplate.opsForSet().isMember(key, postId.toString());
+        logger.info("hasViewed - key: {}, postId: {}, isMember: {}", key, postId, isMember);
+        return isMember;
     }
 
+    // 게시물 조회 유저 저장(조회수 중복 증가 방지)
+    public void cacheViewHistory(Long userId, Long postId) {
+        String key = VIEWED_USER_POST_PREFIX + userId + ":posts";
+        Long added = redisTemplate.opsForSet().add(key, postId.toString());
+        redisTemplate.expire(key, VIEWED_POST_TTL);
+        logger.info("cacheViewHistory - key: {}, postId: {}, added: {}", key, postId, added);
+    }
+
+
+    // 조회한 게시물 ID 목록 조회
+    public Set<String> getViewedPostIdSet(Long userId) {
+        String key = VIEWED_USER_POST_PREFIX + userId + ":posts";
+        Set<String> members = redisTemplate.opsForSet().members(key);
+        return members;
+    }
 
     // 게시물 조회수 증가 (Redis 카운트 증가)
     public Long incrementViewCount(Long postId) {
@@ -261,20 +279,6 @@ public class RedisCacheService {
         Long val = increment(key);
         redisTemplate.expire(key, DEFAULT_TTL);
         return val;
-    }
-
-    // 유저-게시물 조회 이력 (조회수 중복 증가 방지)
-    public void cacheViewHistory(Long userId, Long postId) {
-        String key = VIEWED_USER_POST_PREFIX + userId + ":posts";
-        redisTemplate.opsForSet().add(key, postId.toString());
-        redisTemplate.expire(key, VIEWED_POST_TTL);
-    }
-
-    // 조회한 게시물 ID 목록 조회
-    public Set<String> getViewedPostIdSet(Long userId) {
-        String key = VIEWED_USER_POST_PREFIX + userId + ":posts";
-        Set<String> members = redisTemplate.opsForSet().members(key);
-        return members;
     }
 
     public Long getViewCount(Long postId) {

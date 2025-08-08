@@ -1,4 +1,4 @@
-package com.example.texshorts.security;
+package com.example.texshorts.config;
 
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.databind.ObjectMapper;

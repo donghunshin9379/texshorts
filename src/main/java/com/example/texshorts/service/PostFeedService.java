@@ -12,10 +12,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -25,6 +22,7 @@ public class PostFeedService {
     private final PostRepository postRepository;
     private final RedisCacheService redisCacheService;
     private final UserInterestTagService userInterestTagService;
+
     private static final Logger logger = LoggerFactory.getLogger(PostFeedService.class);
 
     /** 피드 종류
@@ -74,7 +72,12 @@ public class PostFeedService {
         if (cached == null) {
             logger.info("인기 피드 캐시 없음, DB에서 조회 시작");
 
-            Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "viewCount"));
+            Pageable pageable = PageRequest.of(page, size,
+                    Sort.by(Sort.Direction.DESC, "viewCount")
+                            .and(Sort.by(Sort.Direction.DESC, "likeCount"))
+                            .and(Sort.by(Sort.Direction.DESC, "commentCount"))
+            );
+
             cached = postRepository.findAll(pageable).stream()
                     .map(this::toDto)
                     .collect(Collectors.toList());
@@ -86,28 +89,47 @@ public class PostFeedService {
         return cached;
     }
 
-    /** 개인화 게시물 피드 */ //관심태그 조회 캐시로
+    /** 개인화 게시물 피드 */
     private List<PostResponseDTO> getPersonalizedPosts(int page, int size, Long userId) {
-        //로그인상태 아닐때 인기피드 대체
         if (userId == null) return getPopularPosts(page, size, null);
 
-        //관심태그 조회 (관심태그 없을시 인기피드 대체)
+        String feedKeyPrefix = RedisCacheService.PERSONALIZED_POST_LIST_KEY_PREFIX + userId + ":";
+
+        // 1. 피드 캐시 조회
+        List<PostResponseDTO> cachedFeed = redisCacheService.getCachedPostList(page, size, feedKeyPrefix);
+        if (cachedFeed != null) {
+            logger.info("개인화 피드 캐시 HIT - userId: {}", userId);
+            return filterSeenPosts(cachedFeed, userId);
+        }
+
+        // 2. 관심태그 조회 (getUserInterestTags 이미 캐시 → DB 순서 내장)
         List<String> interestTags = userInterestTagService.getUserInterestTags(userId);
-        if (interestTags.isEmpty()) return getPopularPosts(page, size, userId);
 
-        // 관심태그 기반 Post조회 (중복X)
+
+        if (interestTags == null || interestTags.isEmpty()) {
+            logger.info("관심태그 없음 → 인기 게시물 반환 - userId: {}", userId);
+            return getPopularPosts(page, size, userId);
+        }
+
+        // 3. 게시물 DB 조회
         Pageable pageable = PageRequest.of(0, size);
-        List<Post> personalizedPosts = postRepository.findDistinctPostsByTagNames(interestTags, pageable);
-
-        // 최종 개인화 post 부족시 > 인기피드 추가
+        List<Post> personalizedPosts = postRepository.findDistinctPostsByTagNames(
+                new ArrayList<>(interestTags),
+                pageable
+        );
         personalizedPosts = fillWithPopularPostsIfInsufficient(personalizedPosts, size);
 
         List<PostResponseDTO> dtos = personalizedPosts.stream()
                 .map(this::toDto)
                 .collect(Collectors.toList());
 
+        // 4. 게시물 캐시 저장
+        redisCacheService.cachePostList(page, size, dtos, feedKeyPrefix);
+
         return filterSeenPosts(dtos, userId);
     }
+
+
 
 
     /** 개인화 피드 부족 시 인기글 보충 */

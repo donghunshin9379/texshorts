@@ -47,18 +47,6 @@ public class PostReactionService {
         saveNewReaction(post, user, type, postId);
     }
 
-    private void deleteReaction(PostReaction reaction, Long postId, ReactionType type) {
-        logger.info("deleteReaction 호출됨");
-        postReactionRepository.deleteById(reaction.getId());
-        postReactionRepository.flush();
-
-        redisCacheService.decrementPostReactionCount(postId, type);
-
-        if (type == ReactionType.LIKE) {
-            requestRedisQueue.enqueueLikeCountUpdate(postId);
-        }
-    }
-
     private void saveNewReaction(Post post, User user, ReactionType type, Long postId) {
         PostReaction newReaction = new PostReaction();
         newReaction.setPost(post);
@@ -76,6 +64,18 @@ public class PostReactionService {
         viewService.increaseViewCountIfNotViewed(postId, user.getId());
         logger.info("PostReaction 기반 시청 기록 저장: userId={}, postId={}, type={}", user.getId(), postId, type);
 
+    }
+
+    private void deleteReaction(PostReaction reaction, Long postId, ReactionType type) {
+        logger.info("deleteReaction 호출됨");
+        postReactionRepository.deleteById(reaction.getId());
+        postReactionRepository.flush();
+
+        redisCacheService.decrementPostReactionCount(postId, type);
+
+        if (type == ReactionType.LIKE) {
+            requestRedisQueue.enqueueLikeCountUpdate(postId);
+        }
     }
 
     public Long getLikeCount(Long postId) {

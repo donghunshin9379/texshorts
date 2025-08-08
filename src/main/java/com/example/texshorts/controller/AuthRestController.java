@@ -5,7 +5,7 @@ import com.example.texshorts.dto.LoginRequest;
 import com.example.texshorts.dto.SignupRequest;
 import com.example.texshorts.entity.User;
 import com.example.texshorts.repository.UserRepository;
-import com.example.texshorts.security.JwtTokenProvider;
+import com.example.texshorts.config.JwtTokenProvider;
 import com.example.texshorts.service.SignUpService;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;

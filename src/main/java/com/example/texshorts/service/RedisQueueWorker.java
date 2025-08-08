@@ -128,6 +128,7 @@ public class RedisQueueWorker implements Runnable {
                     continue;
                 }
 
+                // 시청 기록 갱신 큐 처리
                 Object obj = redisTemplate.opsForList().leftPop(VIEW_HISTORY_SAVE_QUEUE, 1, TimeUnit.SECONDS);
                 if (obj instanceof String jsonStr) {
                     try {

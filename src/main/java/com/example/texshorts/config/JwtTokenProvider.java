@@ -1,4 +1,4 @@
-package com.example.texshorts.security;
+package com.example.texshorts.config;
 
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;

@@ -1,4 +1,4 @@
-package com.example.texshorts.security;
+package com.example.texshorts.config;
 
 import com.example.texshorts.service.CustomUserDetailsService;
 import lombok.RequiredArgsConstructor;
