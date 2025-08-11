@@ -15,7 +15,6 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ViewService {
 
-    private final PostRepository postRepository;
     private final RedisCacheService redisCacheService;
     private final RequestRedisQueue requestRedisQueue;
     private static final Logger logger = LoggerFactory.getLogger(ViewService.class);
@@ -40,7 +39,8 @@ public class ViewService {
 
 
     /**
-     * 여러 태그에 대해 관심태그 갱신 요청을 큐에 한꺼번에 등록
+     * AOP 호출용
+     * 관심태그 추가 갱신 큐
      */
     public void enqueueAddInterestTagsFromPost(Long userId, Long postId) {
         logger.info("AOP > ViewService 호출완료");
@@ -50,6 +50,19 @@ public class ViewService {
             requestRedisQueue.enqueueUserInterestTagUpdate(userId, tag, TagActionType.ADD);
         }
     }
+
+    /**
+     * AOP 호출용
+     * 관심태그 삭제 갱신 큐
+     */
+    public void enqueueRemoveInterestTagsFromPost(Long userId, Long postId) {
+        logger.info("AOP > 관심태그 삭제 요청");
+        List<String> tagNames = redisCacheService.getTagNamesByPostId(postId);
+        for (String tag : tagNames) {
+            requestRedisQueue.enqueueUserInterestTagUpdate(userId, tag, TagActionType.REMOVE);
+        }
+    }
+
 
 //    public void enqueueRemoveInterestTagsFromPost(Long userId, Long postId) {
 //        List<String> tagNames = postRepository.findTagNamesByPostId(postId); // 구체적 구현

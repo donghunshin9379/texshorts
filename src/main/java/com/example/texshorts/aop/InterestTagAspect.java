@@ -31,20 +31,18 @@ public class InterestTagAspect {
         Long userId = null;
         Long postId = null;
         boolean isNotDuplicate = false;
+        ReactionType reactionType = null;
 
         switch (methodName) {
             case "increaseViewCountIfNotViewed" -> {
                 if (args.length == 2 && args[0] instanceof Long && args[1] instanceof Long) {
                     postId = (Long) args[0];
                     userId = (Long) args[1];
-                    // 중복 조회 체크
                     if (redisCacheService.hasViewed(userId, postId)) {
                         log.info("[AOP] 중복 시청 detected, 메서드 실행 차단 - userId: {}, postId: {}", userId, postId);
-                        return null;  // 메서드 실행 안 함
-                    } else {
-                        // 중복 아님, 메서드 실행 필요함을 플래그로 표시
-                        isNotDuplicate = true;
+                        return null;
                     }
+                    isNotDuplicate = true;
                 }
             }
 
@@ -54,34 +52,43 @@ public class InterestTagAspect {
                     userId = ((User) args[1]).getId();
                 }
             }
+
             case "react" -> {
                 if (args.length == 3 && args[2] instanceof ReactionType type) {
-                    if (type != ReactionType.LIKE) {
-                        log.info("[AOP] 싫어요이므로 관심태그 큐 등록 생략 - type: {}", type);
-                        return pjp.proceed();
-                    }
+                    reactionType = type;
                     if (args[0] instanceof Long l) postId = l;
                     if (args[1] instanceof User u) userId = u.getId();
                 }
             }
+
             default -> {
                 log.warn("[AOP] 처리되지 않은 메서드입니다: {}", methodName);
                 return pjp.proceed();
             }
         }
 
-        // 메서드 실행
+        // 원래 메서드 실행
         Object result = pjp.proceed();
 
-// 중복이 아닐 때만 관심태그 큐 등록
-        if (isNotDuplicate && userId != null && postId != null) {
-            viewService.enqueueAddInterestTagsFromPost(userId, postId);
-            log.info("[AOP] 관심태그 큐 등록 요청 - userId: {}, postId: {}", userId, postId);
+        // 관심태그 갱신 처리
+        if (userId != null && postId != null) {
+            if ("increaseViewCountIfNotViewed".equals(methodName) && isNotDuplicate) {
+                viewService.enqueueAddInterestTagsFromPost(userId, postId);
+                log.info("[AOP] 조회로 인한 관심태그 추가 - userId: {}, postId: {}", userId, postId);
+            } else if ("createRootComment".equals(methodName)) {
+                viewService.enqueueAddInterestTagsFromPost(userId, postId);
+                log.info("[AOP] 댓글로 인한 관심태그 추가 - userId: {}, postId: {}", userId, postId);
+            } else if ("react".equals(methodName) && reactionType != null) {
+                if (reactionType == ReactionType.LIKE) {
+                    viewService.enqueueAddInterestTagsFromPost(userId, postId);
+                    log.info("[AOP] 좋아요로 인한 관심태그 추가 - userId: {}, postId: {}", userId, postId);
+                } else if (reactionType == ReactionType.DISLIKE) {
+                    viewService.enqueueRemoveInterestTagsFromPost(userId, postId);
+                    log.info("[AOP] 싫어요로 인한 관심태그 삭제 - userId: {}, postId: {}", userId, postId);
+                }
+            }
         }
-
 
         return result;
     }
 }
-
-
