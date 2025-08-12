@@ -21,7 +21,6 @@ public class RequestRedisQueue {
 
     private final RedisTemplate<String, Object> redisTemplate;
     private final RedisQueueWorker redisQueueWorker;
-    private final RedisCacheService redisCacheService;
 
     private static final String CREATE_QUEUE = "create:post:queue";
     private static final String DELETE_QUEUE = "delete:post:queue";

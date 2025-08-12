@@ -2,6 +2,7 @@ package com.example.texshorts.aop;
 
 import com.example.texshorts.entity.ReactionType;
 import com.example.texshorts.entity.User;
+import com.example.texshorts.service.InterestTagQueueService;
 import com.example.texshorts.service.RedisCacheService;
 import com.example.texshorts.service.ViewService;
 import lombok.RequiredArgsConstructor;
@@ -17,7 +18,7 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class InterestTagAspect {
 
-    private final ViewService viewService;
+    private final InterestTagQueueService interestTagQueueService;
     private final RedisCacheService redisCacheService;
 
     @Around("execution(* com.example.texshorts.service.ViewService.increaseViewCountIfNotViewed(..)) || " +
@@ -73,17 +74,17 @@ public class InterestTagAspect {
         // 관심태그 갱신 처리
         if (userId != null && postId != null) {
             if ("increaseViewCountIfNotViewed".equals(methodName) && isNotDuplicate) {
-                viewService.enqueueAddInterestTagsFromPost(userId, postId);
+                interestTagQueueService.enqueueAddInterestTagsFromPost(userId, postId);
                 log.info("[AOP] 조회로 인한 관심태그 추가 - userId: {}, postId: {}", userId, postId);
             } else if ("createRootComment".equals(methodName)) {
-                viewService.enqueueAddInterestTagsFromPost(userId, postId);
+                interestTagQueueService.enqueueAddInterestTagsFromPost(userId, postId);
                 log.info("[AOP] 댓글로 인한 관심태그 추가 - userId: {}, postId: {}", userId, postId);
             } else if ("react".equals(methodName) && reactionType != null) {
                 if (reactionType == ReactionType.LIKE) {
-                    viewService.enqueueAddInterestTagsFromPost(userId, postId);
+                    interestTagQueueService.enqueueAddInterestTagsFromPost(userId, postId);
                     log.info("[AOP] 좋아요로 인한 관심태그 추가 - userId: {}, postId: {}", userId, postId);
                 } else if (reactionType == ReactionType.DISLIKE) {
-                    viewService.enqueueRemoveInterestTagsFromPost(userId, postId);
+                    interestTagQueueService.enqueueRemoveInterestTagsFromPost(userId, postId);
                     log.info("[AOP] 싫어요로 인한 관심태그 삭제 - userId: {}, postId: {}", userId, postId);
                 }
             }

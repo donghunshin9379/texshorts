@@ -120,7 +120,7 @@ public class RedisQueueWorker implements Runnable {
                     }
                 }
 
-                // 인기 피드 캐시 갱신 큐 처리
+                // 인기 피드 갱신 큐 처리
                 String popularFeedSignal = (String) redisTemplate.opsForList().leftPop(POPULAR_FEED_UPDATE_QUEUE, 1, TimeUnit.SECONDS);
                 if (popularFeedSignal != null) {
                     popularFeedRefresher.refreshPopularFeedCache();
