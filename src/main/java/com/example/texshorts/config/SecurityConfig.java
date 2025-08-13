@@ -71,7 +71,8 @@ public class SecurityConfig {
                                 "/v2/api-docs",
                                 "/v2/api-docs/**",
                                 "/swagger-resources/**",
-                                "/webjars/**"
+                                "/webjars/**",
+                                "/thumbnails/**"
                         ).permitAll()
 
                                 // ROLE권한 필요

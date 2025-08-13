@@ -49,7 +49,7 @@ public class PostService {
 
     public String saveThumbnail(MultipartFile thumbnail) throws IOException {
         String fileName = UUID.randomUUID() + "_" + thumbnail.getOriginalFilename();
-        Path uploadPath = Paths.get(uploadDir);
+        Path uploadPath = Paths.get(uploadDir, "thumbnails");
         if (!Files.exists(uploadPath)) {
             Files.createDirectories(uploadPath);
         }
@@ -57,6 +57,7 @@ public class PostService {
         Files.copy(thumbnail.getInputStream(), filePath);
         return fileName;
     }
+
 
 
     /** 게시물 삭제 요청*/

@@ -26,6 +26,7 @@ public class PostDeletionService {
     private final PostTagService postTagService;
     private final PostViewRepository postViewRepository;
 
+
     private static final Logger logger = LoggerFactory.getLogger(PostDeletionService.class);
 
     public void deletePostHard(Long postId) {

@@ -33,7 +33,7 @@ public class PostResponseDTO {  /** 게시물 출력용 바디 DTO*/
         dto.setNickname(post.getUser().getNickname());
         dto.setTitle(post.getTitle());
         dto.setContent(post.getContent());
-        dto.setThumbnailUrl(urlGenerator.apply(post.getThumbnailPath()));  // 썸네일 경로 → URL
+        dto.setThumbnailUrl(urlGenerator.apply(post.getThumbnailPath()));
         dto.setCreatedAt(post.getCreatedAt());
         dto.setTags(post.getTags());
         dto.setPostId(post.getId());

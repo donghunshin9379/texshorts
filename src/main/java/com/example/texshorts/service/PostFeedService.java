@@ -7,6 +7,7 @@ import com.example.texshorts.repository.PostRepository;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -25,185 +26,148 @@ public class PostFeedService {
 
     private static final Logger logger = LoggerFactory.getLogger(PostFeedService.class);
 
-    /** 피드 종류
-     * LATEST: 최근 피드
-     * POPULAR: 인기 피드
-     * PERSONALIZED: 개인화 피드
-     * */
-    public List<PostResponseDTO> getFeed(FeedType type, int page, int size, Long userId) {
-        return switch (type) {
-            case LATEST -> getLatestPosts(page, size, userId);
-            case POPULAR -> getPopularPosts(page, size, userId);
-            case PERSONALIZED -> getPersonalizedPosts(page, size, userId);
-        };
+    /**
+     * combined feed (중복 제거 + 페이지 단위)
+     */
+    public List<PostResponseDTO> getCombinedFeed(int page, int size, Long userId) {
+        // 피드 비율
+        int latestSize = size / 4; //전체 1/4 (25%)
+        int popularSize = size / 2; //전체 1/2 (50%)
+        int personalizedSize = size - latestSize - popularSize; //나머지 1/4 (25%)
+
+        List<PostResponseDTO> latest = getFeed(FeedType.LATEST, latestSize, userId);
+        List<PostResponseDTO> popular = getFeed(FeedType.POPULAR, popularSize, userId);
+        List<PostResponseDTO> personalized = getFeed(FeedType.PERSONALIZED, personalizedSize, userId);
+
+        // 합치기 + 중복 제거
+        Map<Long, PostResponseDTO> map = new LinkedHashMap<>();
+        latest.forEach(dto -> map.putIfAbsent(dto.getPostId(), dto));
+        popular.forEach(dto -> map.putIfAbsent(dto.getPostId(), dto));
+        personalized.forEach(dto -> map.putIfAbsent(dto.getPostId(), dto));
+
+        List<PostResponseDTO> combined = new ArrayList<>(map.values());
+        Collections.shuffle(combined);
+
+        // 페이지 슬라이스
+        int from = page * size;
+        int to = Math.min(from + size, combined.size());
+        if (from >= combined.size()) return List.of();
+        return combined.subList(from, to);
     }
 
+
+    @Value("${app.server-url}")
+    private String serverUrl;
 
     /**
-     * 캐시 로직 흐름
-     * 최초 호출 시점 캐시 == null
-     * DB > 캐시 저장
-     * 
-     * 이후 호출 시점 캐시(저장됨)
-     * 캐시 반환
-     * */
+     * 타입별 feed
+     */
+    private List<PostResponseDTO> getFeed(FeedType type, int size, Long userId) {
+        String cacheKey = type.name() + "_POST_LIST";
 
-    /** 최근 게시물 피드 */
-    private List<PostResponseDTO> getLatestPosts(int page, int size, Long userId) {
-        List<PostResponseDTO> cached = redisCacheService.getCachedPostList(page, size, RedisCacheService.LATEST_POST_LIST_KEY_PREFIX);
-        if (cached == null) {
-            logger.info("최근 피드 캐시 없음, DB에서 조회 시작");
-
-            Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
-            cached = postRepository.findAll(pageable).stream()
-                    .map(this::toDto)
-                    .collect(Collectors.toList());
-
-            redisCacheService.cachePostList(page, size, cached, RedisCacheService.LATEST_POST_LIST_KEY_PREFIX);
+        // 1. 캐시 조회
+        List<PostResponseDTO> cached = redisCacheService.getCachedPostList(0, size, cacheKey);
+        if (cached != null) {
+            return filterSeenPosts(cached, userId);
         }
 
-        cached = filterSeenPosts(cached, userId);
-        return cached;
-    }
-
-    /** 인기 게시물 피드 */
-    private List<PostResponseDTO> getPopularPosts(int page, int size, Long userId) {
-        List<PostResponseDTO> cached = redisCacheService.getCachedPostList(page, size, RedisCacheService.POPULAR_POST_LIST_KEY_PREFIX);
-        if (cached == null) {
-            logger.info("인기 피드 캐시 없음, DB에서 조회 시작");
-
-            Pageable pageable = PageRequest.of(page, size,
-                    Sort.by(Sort.Direction.DESC, "viewCount")
-                            .and(Sort.by(Sort.Direction.DESC, "likeCount"))
-                            .and(Sort.by(Sort.Direction.DESC, "commentCount"))
-            );
-
-            cached = postRepository.findAll(pageable).stream()
-                    .map(this::toDto)
-                    .collect(Collectors.toList());
-
-            redisCacheService.cachePostList(page, size, cached, RedisCacheService.POPULAR_POST_LIST_KEY_PREFIX);
-        }
-
-        cached = filterSeenPosts(cached, userId);
-        return cached;
-    }
-
-    /** 개인화 게시물 피드 */
-    private List<PostResponseDTO> getPersonalizedPosts(int page, int size, Long userId) {
-        if (userId == null) return getPopularPosts(page, size, null);
-
-        String feedKeyPrefix = RedisCacheService.PERSONALIZED_POST_LIST_KEY_PREFIX + userId + ":";
-
-        // 1. 피드 캐시 조회
-        List<PostResponseDTO> cachedFeed = redisCacheService.getCachedPostList(page, size, feedKeyPrefix);
-        if (cachedFeed != null) {
-            logger.info("개인화 피드 캐시 HIT - userId: {}", userId);
-            return filterSeenPosts(cachedFeed, userId);
-        }
-
-        // 2. 관심태그 조회 (getUserInterestTags 이미 캐시 → DB 순서 내장)
-        List<String> interestTags = userInterestTagService.getUserInterestTags(userId);
-
-
-        if (interestTags == null || interestTags.isEmpty()) {
-            logger.info("관심태그 없음 → 인기 게시물 반환 - userId: {}", userId);
-            return getPopularPosts(page, size, userId);
-        }
-
-        // 3. 게시물 DB 조회
+        // 2. DB 조회
+        List<Post> posts;
         Pageable pageable = PageRequest.of(0, size);
-        List<Post> personalizedPosts = postRepository.findDistinctPostsByTagNames(
-                new ArrayList<>(interestTags),
-                pageable
-        );
-        personalizedPosts = fillWithPopularPostsIfInsufficient(personalizedPosts, size);
+        switch (type) {
+            case LATEST -> posts = postRepository.findDistinctLatestPosts(
+                    PageRequest.of(0, size, Sort.by(Sort.Direction.DESC, "createdAt"))
+            ).getContent();
+            case POPULAR -> posts = postRepository.findDistinctPopularPosts(
+                    PageRequest.of(0, size, Sort.by(Sort.Direction.DESC, "viewCount")
+                            .and(Sort.by(Sort.Direction.DESC, "likeCount"))
+                            .and(Sort.by(Sort.Direction.DESC, "commentCount")))
+            ).getContent();
+            case PERSONALIZED -> {
+                if (userId == null) {
+                    posts = postRepository.findDistinctPopularPosts(
+                            PageRequest.of(0, size, Sort.by(Sort.Direction.DESC, "viewCount")
+                                    .and(Sort.by(Sort.Direction.DESC, "likeCount"))
+                                    .and(Sort.by(Sort.Direction.DESC, "commentCount")))
+                    ).getContent();
+                } else {
+                    List<String> tags = userInterestTagService.getUserInterestTags(userId);
+                    posts = postRepository.findDistinctPostsByTagNames(tags, PageRequest.of(0, size));
+                }
+            }
+            default -> posts = List.of();
+        }
 
-        List<PostResponseDTO> dtos = personalizedPosts.stream()
-                .map(this::toDto)
-                .collect(Collectors.toList());
+        // 3. DTO 변환 + 캐싱
+        List<PostResponseDTO> dtos = posts.stream()
+                .map(post -> toDto(post, serverUrl))
+                .toList();
 
-        // 4. 게시물 캐시 저장
-        redisCacheService.cachePostList(page, size, dtos, feedKeyPrefix);
+        redisCacheService.cachePostList(0, dtos.size(), dtos, cacheKey);
+
 
         return filterSeenPosts(dtos, userId);
     }
 
 
-
-
-    /** 개인화 피드 부족 시 인기글 보충 */
-    private List<Post> fillWithPopularPostsIfInsufficient(List<Post> posts, int size) {
-        if (posts.size() >= size) return posts;
-
-        int shortage = size - posts.size();
-        Pageable pageable = PageRequest.of(0, shortage, Sort.by(Sort.Direction.DESC, "viewCount"));
-        List<Post> fallback = postRepository.findAll(pageable).getContent();
-
-        Set<Long> existingIds = posts.stream().map(Post::getId).collect(Collectors.toSet());
-        List<Post> additional = fallback.stream()
-                .filter(post -> !existingIds.contains(post.getId()))
-                .collect(Collectors.toList());
-
-        List<Post> result = new ArrayList<>(posts);
-        result.addAll(additional);
-        return result;
-    }
-
-
-
-    /** 노출 피드 중복방지 필터링 */
+    /** 본 게시물 필터링 */
     private List<PostResponseDTO> filterSeenPosts(List<PostResponseDTO> posts, Long userId) {
         if (userId == null) return posts;
-        Set<String> seenPostIds = redisCacheService.getSeenFeedPostIds(userId);
-        if (seenPostIds == null || seenPostIds.isEmpty()) return posts;
+        Set<String> seen = redisCacheService.getSeenFeedPostIds(userId);
+        if (seen == null || seen.isEmpty()) return posts;
         return posts.stream()
-                .filter(post -> !seenPostIds.contains(String.valueOf(post.getPostId())))
-                .collect(Collectors.toList());
+                .filter(p -> !seen.contains(String.valueOf(p.getPostId())))
+                .toList();
     }
 
+    /** Post 엔티티 -> DTO */
+    public PostResponseDTO toDto(Post post, String serverUrl) {
+        String thumbnailPath = post.getThumbnailPath();
 
-    /** 게시물 목록 조회 API 호출용 */
-    public PostResponseDTO toDto(Post post) {
-        List<String> lines = contentToLines(post.getContent());
+        if (!(thumbnailPath.startsWith("http://") || thumbnailPath.startsWith("https://"))) {
+            thumbnailPath = serverUrl + "/thumbnails/" + thumbnailPath;
+        }
+
         return new PostResponseDTO(
                 post.getUser().getNickname(),
                 post.getTitle(),
                 post.getContent(),
-                post.getThumbnailPath(),
+                thumbnailPath,
                 post.getCreatedAt(),
-                lines,
+                contentToLines(post.getContent()),
                 post.getTags(),
                 post.getId()
         );
     }
 
+
+
+    /** 본 게시물 TTL 처리 */
+    public void markPostAsSeen(Long userId, Long postId) {
+        redisCacheService.cacheSeenFeedPost(userId, postId);
+    }
+
+    // --- content 처리 ---
     private List<String> contentToLines(String content) {
         if (content == null || content.isEmpty()) return List.of();
-
-        List<String> rawLines = Arrays.stream(
-                        content.replaceAll("\\r\\n", "\n")
-                                .replaceAll("\n{3,}", "\n\n")
-                                .split("\n"))
+        List<String> raw = Arrays.stream(content.replaceAll("\\r\\n", "\n")
+                        .replaceAll("\n{3,}", "\n\n")
+                        .split("\n"))
                 .map(String::trim)
-                .collect(Collectors.toList());
-
-        return filterConsecutiveEmptyLines(rawLines);
+                .toList();
+        return filterConsecutiveEmptyLines(raw);
     }
 
     private List<String> filterConsecutiveEmptyLines(List<String> lines) {
         List<String> filtered = new ArrayList<>();
-        boolean lastLineWasEmpty = false;
-
+        boolean lastEmpty = false;
         for (String line : lines) {
             if (line.isEmpty()) {
-                if (!lastLineWasEmpty) {
-                    filtered.add(line);
-                    lastLineWasEmpty = true;
-                }
+                if (!lastEmpty) filtered.add(line);
+                lastEmpty = true;
             } else {
                 filtered.add(line);
-                lastLineWasEmpty = false;
+                lastEmpty = false;
             }
         }
         return filtered;

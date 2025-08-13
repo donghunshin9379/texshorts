@@ -29,10 +29,14 @@ public class PopularFeedRefresher {
                         .and(Sort.by(Sort.Direction.DESC, "commentCount"))
         );
 
+        String serverUrl = "http://localhost:8080"; // application.properties에서 주입 가능
+
         List<PostResponseDTO> popularPosts = postRepository.findAll(pageable).stream()
-                .map(postFeedService::toDto)
+                .map(post -> postFeedService.toDto(post, serverUrl)) // 람다로 serverUrl 전달
                 .toList();
+
 
         redisCacheService.cachePostList(page, size, popularPosts, RedisCacheService.POPULAR_POST_LIST_KEY_PREFIX);
     }
+
 }

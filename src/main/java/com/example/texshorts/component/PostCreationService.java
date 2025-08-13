@@ -38,12 +38,11 @@ public class PostCreationService {
 
         List<String> tagList = tagParserUtils.parseTagsToList(dto.getTags());
         String tagsWithHash = tagParserUtils.formatTagsWithHash(tagList);
-        String thumbnailUrl = generateThumbnailUrl(msg.getThumbnailPath());
 
         User user = userRepository.getReferenceById(userId);
 
         Post post = Post.builder()
-                .thumbnailPath(thumbnailUrl)
+                .thumbnailPath(msg.getThumbnailPath())
                 .title(dto.getTitle())
                 .content(dto.getContent())
                 .location(dto.getLocation())
@@ -65,8 +64,5 @@ public class PostCreationService {
     }
 
 
-    public String generateThumbnailUrl(String fileName) {
-         return "http://localhost:8080/thumbnails/" + fileName;
-    }
 
 }
