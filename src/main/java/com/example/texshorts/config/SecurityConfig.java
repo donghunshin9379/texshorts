@@ -6,6 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.Customizer;
@@ -63,7 +64,8 @@ public class SecurityConfig {
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
-                                "/api/auth/**",
+                                "/api/auth/login",
+                                "/api/auth/signup",
                                 "/api/signup/**",
                                 "/swagger-ui.html",
                                 "/swagger-ui/**",
@@ -75,9 +77,12 @@ public class SecurityConfig {
                                 "/thumbnails/**"
                         ).permitAll()
 
+                                // 브라우저 preflight(OPTIONS) 허용
+                                .requestMatchers(HttpMethod.OPTIONS, "/api/**").permitAll()
+                                // 토큰 인증 필요
+                                .requestMatchers("/api/auth/validate").authenticated()
                                 // ROLE권한 필요
                                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
-
                                 // 토큰 인증 필요
                                 .requestMatchers("/api/**").authenticated()
                 )
@@ -91,10 +96,17 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        configuration.addAllowedOrigin("http://localhost:8080");
-        configuration.addAllowedOrigin("http://localhost:61330");
-        configuration.setAllowedMethods(List.of("*"));
-        configuration.setAllowedHeaders(List.of("*"));
+        // Authorization 헤더 허용
+        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type"));
+
+        // 실제 브라우저 origin과 맞추기 (Flutter Web 개발용)
+        configuration.addAllowedOrigin("http://localhost:61330"); // 웹 브라우저 origin
+        configuration.addAllowedOrigin("http://localhost:8080");   // 필요 시 추가
+
+        // 메서드 허용
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+
+        // 쿠키/인증 정보 허용
         configuration.setAllowCredentials(true);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
@@ -102,4 +114,6 @@ public class SecurityConfig {
 
         return source;
     }
+
+
 }

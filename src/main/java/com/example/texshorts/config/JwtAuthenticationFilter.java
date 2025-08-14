@@ -33,13 +33,22 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
-        String path = request.getRequestURI();
-
-        // 로그인, 회원가입, 아이디 중복확인 등 필터 제외할 경로 추가
-        if (path.startsWith("/api/auth/") || path.equals("/api/check-username") || path.equals("/api/check-nickname")) {
+        // 프론트 OPTIONS 요청
+        if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
             filterChain.doFilter(request, response);
             return;
         }
+
+        String path = request.getRequestURI();
+
+        // 로그인, 회원가입, 아이디 중복확인 등 필터 제외할 경로 추가
+        if ((path.startsWith("/api/auth/") && !path.equals("/api/auth/validate"))
+                || path.equals("/api/check-username")
+                || path.equals("/api/check-nickname")) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
 
         logger.info("[JWT 필터] 요청 URI : {}", path);
         logger.info("[JWT 필터] Authorization 헤더 : {}", request.getHeader("Authorization"));
