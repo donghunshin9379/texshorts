@@ -9,12 +9,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -26,18 +24,22 @@ public class PostFeedService {
 
     private static final Logger logger = LoggerFactory.getLogger(PostFeedService.class);
 
+    @Value("${app.server-url}")
+    private String serverUrl;
+
     /**
-     * combined feed (중복 제거 + 페이지 단위)
+     * combined feed with page slice from cache
      */
     public List<PostResponseDTO> getCombinedFeed(int page, int size, Long userId) {
-        // 피드 비율
-        int latestSize = size / 4; //전체 1/4 (25%)
-        int popularSize = size / 2; //전체 1/2 (50%)
-        int personalizedSize = size - latestSize - popularSize; //나머지 1/4 (25%)
+        int fetchSize = size * 5; // 충분히 큰 수로 캐시에 미리 확보
 
-        List<PostResponseDTO> latest = getFeed(FeedType.LATEST, latestSize, userId);
-        List<PostResponseDTO> popular = getFeed(FeedType.POPULAR, popularSize, userId);
-        List<PostResponseDTO> personalized = getFeed(FeedType.PERSONALIZED, personalizedSize, userId);
+        int latestSize = fetchSize / 4;
+        int popularSize = fetchSize / 2;
+        int personalizedSize = fetchSize - latestSize - popularSize;
+
+        List<PostResponseDTO> latest = getFeedFromCacheOrDb(FeedType.LATEST, latestSize, userId);
+        List<PostResponseDTO> popular = getFeedFromCacheOrDb(FeedType.POPULAR, popularSize, userId);
+        List<PostResponseDTO> personalized = getFeedFromCacheOrDb(FeedType.PERSONALIZED, personalizedSize, userId);
 
         // 합치기 + 중복 제거
         Map<Long, PostResponseDTO> map = new LinkedHashMap<>();
@@ -52,63 +54,60 @@ public class PostFeedService {
         int from = page * size;
         int to = Math.min(from + size, combined.size());
         if (from >= combined.size()) return List.of();
+
         return combined.subList(from, to);
     }
 
-
-    @Value("${app.server-url}")
-    private String serverUrl;
-
-    /**
-     * 타입별 feed
-     */
-    private List<PostResponseDTO> getFeed(FeedType type, int size, Long userId) {
+    private List<PostResponseDTO> getFeedFromCacheOrDb(FeedType type, int fetchSize, Long userId) {
         String cacheKey = type.name() + "_POST_LIST";
 
-        // 1. 캐시 조회
-        List<PostResponseDTO> cached = redisCacheService.getCachedPostList(0, size, cacheKey);
-        if (cached != null) {
+        // 1. 캐시에서 가져오기
+        List<PostResponseDTO> cached = redisCacheService.getCachedPostList(0, fetchSize, cacheKey);
+        if (cached != null && !cached.isEmpty()) {
             return filterSeenPosts(cached, userId);
         }
 
-        // 2. DB 조회
-        List<Post> posts;
-        Pageable pageable = PageRequest.of(0, size);
+        // 2. DB에서 가져오기
+        List<Post> posts = fetchPostsFromDb(type, fetchSize, userId);
+
+        // DTO 변환
+        List<PostResponseDTO> dtos = posts.stream()
+                .map(post -> toDto(post, serverUrl))
+                .toList();
+
+        // 캐시에 저장
+        redisCacheService.cachePostList(0, dtos.size(), dtos, cacheKey);
+
+        return filterSeenPosts(dtos, userId);
+    }
+
+    private List<Post> fetchPostsFromDb(FeedType type, int size, Long userId) {
         switch (type) {
-            case LATEST -> posts = postRepository.findDistinctLatestPosts(
-                    PageRequest.of(0, size, Sort.by(Sort.Direction.DESC, "createdAt"))
-            ).getContent();
-            case POPULAR -> posts = postRepository.findDistinctPopularPosts(
-                    PageRequest.of(0, size, Sort.by(Sort.Direction.DESC, "viewCount")
-                            .and(Sort.by(Sort.Direction.DESC, "likeCount"))
-                            .and(Sort.by(Sort.Direction.DESC, "commentCount")))
-            ).getContent();
-            case PERSONALIZED -> {
+            case LATEST:
+                return postRepository.findDistinctLatestPosts(
+                        PageRequest.of(0, size, Sort.by(Sort.Direction.DESC, "createdAt"))
+                ).getContent();
+            case POPULAR:
+                return postRepository.findDistinctPopularPosts(
+                        PageRequest.of(0, size, Sort.by(Sort.Direction.DESC, "viewCount")
+                                .and(Sort.by(Sort.Direction.DESC, "likeCount"))
+                                .and(Sort.by(Sort.Direction.DESC, "commentCount")))
+                ).getContent();
+            case PERSONALIZED:
                 if (userId == null) {
-                    posts = postRepository.findDistinctPopularPosts(
+                    return postRepository.findDistinctPopularPosts(
                             PageRequest.of(0, size, Sort.by(Sort.Direction.DESC, "viewCount")
                                     .and(Sort.by(Sort.Direction.DESC, "likeCount"))
                                     .and(Sort.by(Sort.Direction.DESC, "commentCount")))
                     ).getContent();
                 } else {
                     List<String> tags = userInterestTagService.getUserInterestTags(userId);
-                    posts = postRepository.findDistinctPostsByTagNames(tags, PageRequest.of(0, size));
+                    return postRepository.findDistinctPostsByTagNames(tags, PageRequest.of(0, size));
                 }
-            }
-            default -> posts = List.of();
+            default:
+                return List.of();
         }
-
-        // 3. DTO 변환 + 캐싱
-        List<PostResponseDTO> dtos = posts.stream()
-                .map(post -> toDto(post, serverUrl))
-                .toList();
-
-        redisCacheService.cachePostList(0, dtos.size(), dtos, cacheKey);
-
-
-        return filterSeenPosts(dtos, userId);
     }
-
 
     /** 본 게시물 필터링 */
     private List<PostResponseDTO> filterSeenPosts(List<PostResponseDTO> posts, Long userId) {
@@ -120,14 +119,12 @@ public class PostFeedService {
                 .toList();
     }
 
-    /** Post 엔티티 -> DTO */
+    /** Post -> DTO */
     public PostResponseDTO toDto(Post post, String serverUrl) {
         String thumbnailPath = post.getThumbnailPath();
-
         if (!(thumbnailPath.startsWith("http://") || thumbnailPath.startsWith("https://"))) {
             thumbnailPath = serverUrl + "/thumbnails/" + thumbnailPath;
         }
-
         return new PostResponseDTO(
                 post.getUser().getNickname(),
                 post.getTitle(),
@@ -139,8 +136,6 @@ public class PostFeedService {
                 post.getId()
         );
     }
-
-
 
     /** 본 게시물 TTL 처리 */
     public void markPostAsSeen(Long userId, Long postId) {
@@ -172,5 +167,4 @@ public class PostFeedService {
         }
         return filtered;
     }
-
 }

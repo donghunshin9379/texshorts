@@ -2,7 +2,8 @@ package com.example.texshorts.controller;
 
 import com.example.texshorts.dto.PostCreateRequest;
 import com.example.texshorts.custom.CustomUserDetails;
-import com.example.texshorts.service.PostFeedService;
+import com.example.texshorts.dto.PostResponseDTO;
+import com.example.texshorts.entity.Post;
 import com.example.texshorts.service.PostService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -10,6 +11,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -24,7 +26,6 @@ import java.util.List;
 @SecurityRequirement(name = "bearerAuth") //swagger 인증용
 public class PostController {
     private final PostService postService;
-    private final PostFeedService postFeedService;
 
     private static final Logger logger = LoggerFactory.getLogger(PostController.class);
 
@@ -37,7 +38,6 @@ public class PostController {
         ObjectMapper mapper = new ObjectMapper();
         PostCreateRequest dto = mapper.readValue(dataJson, PostCreateRequest.class);
 
-        // userId만 전달
         postService.requestCreatePost(thumbnail, dto, customUserDetails.getUserId());
         return ResponseEntity.ok("게시물 생성 성공");
     }
@@ -52,25 +52,23 @@ public class PostController {
         return ResponseEntity.ok("게시물이 삭제되었습니다.");
     }
 
+    @GetMapping("/mine")
+    public ResponseEntity<List<PostResponseDTO>> getMyPost(
+            @AuthenticationPrincipal CustomUserDetails customUserDetails,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
 
+        Page<Post> myPostsPage = postService.getPostsByUserEntities(
+                customUserDetails.getUserId(), page, size
+        );
 
-    // 홈탭 게시물 피드
-//    @GetMapping("/feed/home")
-//    public ResponseEntity<List<PostResponseDTO>> getHomeFeed()
-//
-//    }
+        List<PostResponseDTO> myPostsList = myPostsPage.getContent().stream()
+                .map(PostResponseDTO::fromEntityWithoutThumbnail)
+                .toList();
 
-//    // 검색탭 게시물 피드
-//    @GetMapping("/feed/explore")
-//    public ResponseEntity<Void> getExploreFeed() {
-//
-//    }
-//
-//    // 구독 탭 게시물 피드
-//    @GetMapping("/feed/subscriptions")
-//    public ResponseEntity<Void> getSubscriptionsFeed() {
-//
-//    }
+        return ResponseEntity.ok(myPostsList);
+    }
+
 
 
 

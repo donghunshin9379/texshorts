@@ -1,6 +1,7 @@
 package com.example.texshorts.service;
 
 import com.example.texshorts.dto.PostCreateRequest;
+import com.example.texshorts.dto.PostResponseDTO;
 import com.example.texshorts.dto.message.PostCreationMessage;
 import com.example.texshorts.entity.Post;
 import com.example.texshorts.repository.PostRepository;
@@ -9,6 +10,10 @@ import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,6 +23,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.function.Function;
 
 @Service
 @RequiredArgsConstructor
@@ -47,6 +53,7 @@ public class PostService {
         }
     }
 
+    /** 썸네일 경로 */
     public String saveThumbnail(MultipartFile thumbnail) throws IOException {
         String fileName = UUID.randomUUID() + "_" + thumbnail.getOriginalFilename();
         Path uploadPath = Paths.get(uploadDir, "thumbnails");
@@ -74,6 +81,14 @@ public class PostService {
         postRepository.save(post);
 
         requestRedisQueue.enqueuePostForDeletion(postId); // Redis에 등록
+    }
+
+
+    /** 나의 게시물 요청(특정 유저, 썸네일 제외용) */
+    /** 마이페이지용: 썸네일 제외, 특정 유저 게시물 조회 */
+    public Page<Post> getPostsByUserEntities(Long userId, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        return postRepository.findByUserId(userId, pageable);
     }
 
 

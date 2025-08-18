@@ -77,4 +77,7 @@ public interface PostRepository extends JpaRepository<Post, Long> {
     @Query("UPDATE Post p SET p.viewCount = :count WHERE p.id = :postId")
     void updateViewCount(@Param("postId") Long postId, @Param("count") int count);
 
+    // 유저 ID로 게시물 조회, 페이징 적용
+    Page<Post> findByUserId(Long userId, Pageable pageable);
+
 }
