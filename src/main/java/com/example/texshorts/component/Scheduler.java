@@ -7,6 +7,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+/**'인기' 카테고리 확장 예비*/
 @Component
 @RequiredArgsConstructor
 public class Scheduler {

@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 
+/**인기 카테고리 확장 예비용*/
 @Component
 @RequiredArgsConstructor
 public class PopularFeedRefresher {
@@ -29,10 +30,10 @@ public class PopularFeedRefresher {
                         .and(Sort.by(Sort.Direction.DESC, "commentCount"))
         );
 
-        String serverUrl = "http://localhost:8080"; // application.properties에서 주입 가능
+        String serverUrl = "http://localhost:8080";
 
         List<PostResponseDTO> popularPosts = postRepository.findAll(pageable).stream()
-                .map(post -> postFeedService.toDto(post, serverUrl)) // 람다로 serverUrl 전달
+                .map(post -> postFeedService.toDto(post, serverUrl))
                 .toList();
 
 

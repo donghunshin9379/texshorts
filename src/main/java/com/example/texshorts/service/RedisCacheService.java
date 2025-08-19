@@ -23,7 +23,8 @@ import java.util.function.Supplier;
 @RequiredArgsConstructor
 public class RedisCacheService {
 
-    private final RedisTemplate<String, String> redisTemplate;
+    private final RedisTemplate<String, String> redisTemplate;      // 기존 JSON/String 캐시용
+    private final RedisTemplate<String, Long> redisLongTemplate;    // 숫자(Long) 카운트용
     private final CommentRepository commentRepository;
     private final ObjectMapper objectMapper;
     private final PostRepository postRepository;
@@ -39,10 +40,8 @@ public class RedisCacheService {
     private static final String REPLY_LIST_KEY_PREFIX = "comment:replies:";
     private static final String REPLY_COUNT_KEY_PREFIX = "comment:replyCount:";
     private static final String POST_REACTION_KEY_PREFIX = "post:";
-    public static final String LATEST_POST_LIST_KEY_PREFIX = "post:latest:";         // 최신 피드
-    public static final String POPULAR_POST_LIST_KEY_PREFIX = "post:popular:"; // 인기 피드
+    public static final String POPULAR_POST_LIST_KEY_PREFIX = "post:popular:"; // '인기' 카테고리 예비
     private static final String VIEWED_USER_POST_PREFIX = "viewed:user:";
-    public static final String PERSONALIZED_POST_LIST_KEY_PREFIX = "feed:personalized:"; // 개인화 피드
     private static final String VIEW_COUNT_PREFIX = "viewCount:";
     private static final String USER_INTEREST_TAGS_PREFIX = "user:interest_tags:"; // 관심태그
     private static final String POST_TAG_NAMES_KEY_PREFIX = "post:tags:";
@@ -133,16 +132,11 @@ public class RedisCacheService {
     // === 댓글 수 관련 ===
     public int getRootCommentCount(Long postId) {
         String key = COMMENT_COUNT_KEY_PREFIX + postId;
-        String cached = get(key);
-        if (cached != null) {
-            try {
-                return Integer.parseInt(cached);
-            } catch (NumberFormatException e) {
-                logger.warn("댓글 수 캐시 파싱 실패: {}", e.getMessage());
-            }
-        }
+        Long cached = redisLongTemplate.opsForValue().get(key);
+        if (cached != null) return cached.intValue();
+
         int count = commentRepository.countByPostIdAndParentIsNullAndIsDeletedFalse(postId);
-        setAs(key, String.valueOf(count));
+        redisLongTemplate.opsForValue().setIfAbsent(key, (long) count);
         return count;
     }
 
@@ -164,16 +158,11 @@ public class RedisCacheService {
     // === 답글 수 관련 ===
     public int getReplyCount(Long parentCommentId) {
         String key = REPLY_COUNT_KEY_PREFIX + parentCommentId;
-        String cached = get(key);
-        if (cached != null) {
-            try {
-                return Integer.parseInt(cached);
-            } catch (NumberFormatException e) {
-                logger.warn("답글 수 캐시 파싱 실패: {}", e.getMessage());
-            }
-        }
+        Long cached = redisLongTemplate.opsForValue().get(key);
+        if (cached != null) return cached.intValue();
+
         int count = commentRepository.countByParentIdAndIsDeletedFalse(parentCommentId);
-        setAs(key, String.valueOf(count));
+        redisLongTemplate.opsForValue().setIfAbsent(key, (long) count);
         return count;
     }
 
@@ -220,18 +209,14 @@ public class RedisCacheService {
         return POST_REACTION_KEY_PREFIX + postId + ":" + type.name().toLowerCase();
     }
 
+    // 게시물(피드) 좋아요 수 get
     public Long getPostReactionCount(Long postId, ReactionType type, Supplier<Long> dbCountSupplier) {
         String key = getPostReactionKey(postId, type);
-        String cached = get(key);
-        if (cached != null) {
-            try {
-                return Long.parseLong(cached);
-            } catch (NumberFormatException e) {
-                logger.warn("Post Reaction count 캐시 파싱 실패: {}", e.getMessage());
-            }
-        }
+        Long cached = redisLongTemplate.opsForValue().get(key);
+        if (cached != null) return cached;
+
         Long count = dbCountSupplier.get();
-        setAs(key, String.valueOf(count));
+        redisLongTemplate.opsForValue().setIfAbsent(key, count);
         return count;
     }
 
@@ -281,30 +266,32 @@ public class RedisCacheService {
         return val;
     }
 
+    // 게시물(피드) 조회수 get
     public Long getViewCount(Long postId) {
         String key = VIEW_COUNT_PREFIX + postId;
-        String value = get(key);
-        if (value == null) return null;
-        try {
-            return Long.valueOf(value);
-        } catch (NumberFormatException e) {
-            logger.warn("View count 파싱 실패: {}", e.getMessage());
-            return null;
-        }
+        Long cached = redisLongTemplate.opsForValue().get(key);
+        return cached != null ? cached : 0L;
     }
 
 
     // === Post Feed 캐시 관련 ===
-    /**피드 캐시 get*/
+    /** 피드 캐시 조회 */
     public List<PostResponseDTO> getCachedPostList(int page, int size, String prefix) {
-        String key = prefix + page + ":size:" + size;
-        return getListAs(key, new TypeReference<>() {});
+        String key = prefix + "page:" + page + ":size:" + size;
+        List<PostResponseDTO> cached = getListAs(key, new TypeReference<>() {});
+        if (cached == null) {
+            logger.info("캐시 비어 있음, key: {}", key);
+            return List.of();
+        }
+        return cached;
     }
 
-    /** 피드 캐시 저장*/
+    /** 피드 캐시 저장 */
     public void cachePostList(int page, int size, List<PostResponseDTO> posts, String prefix) {
-        String key = prefix + page + ":size:" + size;
+        if (posts == null || posts.isEmpty()) return;
+        String key = prefix + "page:" + page + ":size:" + size;
         setAs(key, posts, POST_LIST_TTL);
+        logger.info("캐시 저장 성공, key: {}, size: {}", key, posts.size());
     }
 
 
@@ -324,6 +311,18 @@ public class RedisCacheService {
         String key = "feed:seen:" + userId;
         redisTemplate.delete(key);
     }
+
+    /** 피드(게시물) 생성시 카운트 초기화 */
+    public void initializePostCounts(Long postId) {
+        String viewKey = VIEW_COUNT_PREFIX + postId;
+        String commentKey = COMMENT_COUNT_KEY_PREFIX + postId;
+        String likeKey = getPostReactionKey(postId, ReactionType.LIKE);
+
+        redisLongTemplate.opsForValue().setIfAbsent(viewKey, 0L);
+        redisLongTemplate.opsForValue().setIfAbsent(commentKey, 0L);
+        redisLongTemplate.opsForValue().setIfAbsent(likeKey, 0L);
+    }
+
 
 
     /** 관심태그 관련 =========================================*/

@@ -19,6 +19,7 @@ public interface CommentRepository extends JpaRepository<Comment, Long> {
     int countByParentIdAndIsDeletedFalse(Long parentId);
 
 
+
     /** 삭제 */
     // 페이징쿼리
     @Query("SELECT c FROM Comment c WHERE c.post.id = :postId")
