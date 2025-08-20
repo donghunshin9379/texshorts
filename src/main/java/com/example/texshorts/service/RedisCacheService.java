@@ -30,6 +30,7 @@ public class RedisCacheService {
     private final PostRepository postRepository;
 
     private static final Duration DEFAULT_TTL = Duration.ofMinutes(30);
+    private static final Duration COMMENT_TTL = Duration.ofMinutes(3);
     private static final Duration VIEWED_POST_TTL = Duration.ofHours(1);
     /**게시물 피드(캐시) 갱신 주기*/
     public static final Duration POST_LIST_TTL = Duration.ofMinutes(10);
@@ -184,7 +185,7 @@ public class RedisCacheService {
     }
 
     public void cacheRootComments(Long postId, List<CommentResponseDTO> comments) {
-        setAs(COMMENT_LIST_KEY_PREFIX + postId, comments, DEFAULT_TTL);
+        setAs(COMMENT_LIST_KEY_PREFIX + postId, comments, COMMENT_TTL);
     }
 
     public void evictRootCommentList(Long postId) {
@@ -197,7 +198,7 @@ public class RedisCacheService {
     }
 
     public void cacheReplies(Long parentCommentId, List<CommentResponseDTO> replies) {
-        setAs(REPLY_LIST_KEY_PREFIX + parentCommentId, replies, DEFAULT_TTL);
+        setAs(REPLY_LIST_KEY_PREFIX + parentCommentId, replies, COMMENT_TTL);
     }
 
     public void evictReplyList(Long parentCommentId) {

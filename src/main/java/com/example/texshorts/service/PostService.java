@@ -3,6 +3,7 @@ package com.example.texshorts.service;
 import com.example.texshorts.dto.PostCreateRequest;
 import com.example.texshorts.dto.PostResponseDTO;
 import com.example.texshorts.dto.message.PostCreationMessage;
+import com.example.texshorts.dto.message.PostDeleteMessage;
 import com.example.texshorts.entity.Post;
 import com.example.texshorts.repository.PostRepository;
 import jakarta.persistence.EntityNotFoundException;
@@ -65,23 +66,14 @@ public class PostService {
         return fileName;
     }
 
-
-
     /** 게시물 삭제 요청*/
-    @Transactional
     public void requestDeletePost(Long postId, Long userId) {
-        Post post = postRepository.findById(postId)
-                .orElseThrow(() -> new EntityNotFoundException("게시물이 없습니다."));
-
-        if (!post.getUser().getId().equals(userId)) {
-            throw new AccessDeniedException("본인의 게시물이 아닙니다.");
-        }
-
-        post.setDeleted(true); //soft 삭제
-        postRepository.save(post);
-
-        requestRedisQueue.enqueuePostForDeletion(postId); // Redis에 등록
+        // 게시물 존재 여부 확인
+        postRepository.findById(postId).orElseThrow(() -> new EntityNotFoundException("게시물이 없습니다."));
+        // 큐 등록
+        requestRedisQueue.enqueuePostDeletion(new PostDeleteMessage(postId, userId));
     }
+
 
 
     /** 나의 게시물 요청(특정 유저, 썸네일 제외용) */

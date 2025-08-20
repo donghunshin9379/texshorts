@@ -30,11 +30,9 @@ public class PostController {
     private static final Logger logger = LoggerFactory.getLogger(PostController.class);
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<?> createPost(
-            @RequestPart("thumbnail") MultipartFile thumbnail,
-            @RequestPart("data") String dataJson,
-            @AuthenticationPrincipal CustomUserDetails customUserDetails
-    ) throws JsonProcessingException {
+    public ResponseEntity<?> createPost(@RequestPart("thumbnail") MultipartFile thumbnail,
+                                        @RequestPart("data") String dataJson,
+                                        @AuthenticationPrincipal CustomUserDetails customUserDetails) throws JsonProcessingException {
         ObjectMapper mapper = new ObjectMapper();
         PostCreateRequest dto = mapper.readValue(dataJson, PostCreateRequest.class);
 
@@ -43,12 +41,9 @@ public class PostController {
     }
 
     @DeleteMapping("/delete")
-    public ResponseEntity<?> deletePost(
-            @RequestParam Long postId,
-            @AuthenticationPrincipal CustomUserDetails customUserDetails) {
-
+    public ResponseEntity<?> deletePost(@RequestParam Long postId,
+                                        @AuthenticationPrincipal CustomUserDetails customUserDetails) {
         postService.requestDeletePost(postId, customUserDetails.getUserId());
-        logger.info("컨트롤러 삭제요청 ID : {}", customUserDetails.getUserId());
         return ResponseEntity.ok("게시물이 삭제되었습니다.");
     }
 

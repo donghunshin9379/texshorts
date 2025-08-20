@@ -1,9 +1,7 @@
 package com.example.texshorts.service;
 
 import com.example.texshorts.component.*;
-import com.example.texshorts.dto.message.PostCreationMessage;
-import com.example.texshorts.dto.message.UserInterestTagQueueMessage;
-import com.example.texshorts.dto.message.ViewHistorySaveMessage;
+import com.example.texshorts.dto.message.*;
 import com.example.texshorts.entity.TagActionType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -14,6 +12,8 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+
+
 @Component
 @RequiredArgsConstructor
 public class RedisQueueWorker implements Runnable {
@@ -21,8 +21,10 @@ public class RedisQueueWorker implements Runnable {
     private final RedisTemplate<String, Object> redisTemplate;
     private final PostCreationService postCreationService;
     private final PostDeletionService postDeletionService;
+    private final CommentCreationService commentCreationService;
+    private final ReplyCommentCreationService replyCommentCreationService;
+    private final CommentDeletionService commentDeletionService;
     private final UserInterestTagWorker userInterestTagWorker;
-    private final CommentCountFlusher commentCountFlusher;
     private final ViewCountFlusher viewCountFlusher;
     private final PopularFeedRefresher popularFeedRefresher;
     private final ReactionCountFlusher reactionCountFlusher;
@@ -30,9 +32,13 @@ public class RedisQueueWorker implements Runnable {
 
     private static final String CREATE_QUEUE = "create:post:queue";
     private static final String DELETE_QUEUE = "delete:post:queue";
+
+    private static final String COMMENT_CREATE_QUEUE = "create:comment:queue";
+    private static final String REPLY_COMMENT_CREATE_QUEUE = "create:reply:comment:queue";
+    private static final String COMMENT_DELETE_QUEUE = "delete:comment:queue";
+
     private static final String USER_INTEREST_TAG_QUEUE = "update:userInterestTag:queue";
     private static final String LIKE_COUNT_UPDATE_QUEUE = "update:like_count:queue";
-    private static final String COMMENT_COUNT_UPDATE_QUEUE = "update:commentCount:queue";
     private static final String VIEW_COUNT_UPDATE_QUEUE = "update:viewCount:queue";
     private static final String POPULAR_FEED_UPDATE_QUEUE = "update:popularFeed:queue";
     private static final String VIEW_HISTORY_SAVE_QUEUE = "update:viewHistorySave:queue";
@@ -47,9 +53,11 @@ public class RedisQueueWorker implements Runnable {
     private static final List<String> MONITORED_QUEUES = List.of(
             CREATE_QUEUE,
             DELETE_QUEUE,
+            COMMENT_CREATE_QUEUE,
+            REPLY_COMMENT_CREATE_QUEUE,
+            COMMENT_DELETE_QUEUE,
             USER_INTEREST_TAG_QUEUE,
             LIKE_COUNT_UPDATE_QUEUE,
-            COMMENT_COUNT_UPDATE_QUEUE,
             VIEW_COUNT_UPDATE_QUEUE,
             POPULAR_FEED_UPDATE_QUEUE,
             VIEW_HISTORY_SAVE_QUEUE
@@ -61,19 +69,41 @@ public class RedisQueueWorker implements Runnable {
         while (running) {
             try {
                 // 게시물 생성 큐 처리
-                Object messageObj = redisTemplate.opsForList().leftPop(CREATE_QUEUE, 1, TimeUnit.SECONDS);
-                if (messageObj instanceof PostCreationMessage msg) {
+                Object postCreationMessageObj = redisTemplate.opsForList().leftPop(CREATE_QUEUE, 1, TimeUnit.SECONDS);
+                if (postCreationMessageObj instanceof PostCreationMessage msg) {
                     postCreationService.createPostFromMessage(msg);
                     continue;
                 }
 
                 // 게시물 삭제 큐 처리
-                String postIdStr = (String) redisTemplate.opsForList().leftPop(DELETE_QUEUE, 1, TimeUnit.SECONDS);
-                if (postIdStr != null) {
-                    Long postId = Long.parseLong(postIdStr);
-                    postDeletionService.deletePostHard(postId);
+                Object postDeleteObj = redisTemplate.opsForList().leftPop(DELETE_QUEUE, 1, TimeUnit.SECONDS);
+                if (postDeleteObj instanceof PostDeleteMessage msg) {
+                    postDeletionService.deletePostHard(msg);
                     continue;
                 }
+
+                // 댓글 생성 큐 처리
+                Object commentCreationMessageObj = redisTemplate.opsForList().leftPop(COMMENT_CREATE_QUEUE, 1, TimeUnit.SECONDS);
+                if (commentCreationMessageObj instanceof CommentCreationMessage msg) {
+                    commentCreationService.createCommentFromMessage(msg);
+                    continue;
+                }
+
+                // 답글 생성 큐처리
+                Object replyCommentCreationMessageObj = redisTemplate.opsForList().leftPop(REPLY_COMMENT_CREATE_QUEUE, 1, TimeUnit.SECONDS);
+                if (replyCommentCreationMessageObj instanceof ReplyCommentCreationMessage msg) {
+                    replyCommentCreationService.createReplyCommentFromMessage(msg);
+                    continue;
+                }
+
+                // 댓글 삭제 큐 처리
+                Object commentDeleteObj = redisTemplate.opsForList().leftPop(COMMENT_DELETE_QUEUE, 1, TimeUnit.SECONDS);
+                if (commentDeleteObj instanceof CommentDeleteMessage msg) {
+                    commentDeletionService.deleteCommentHard(msg);
+                    continue;
+                }
+
+
 
                 // 좋아요 카운트 갱신 큐 처리
                 String likeCountPostIdStr = (String) redisTemplate.opsForList().leftPop(LIKE_COUNT_UPDATE_QUEUE, 1, TimeUnit.SECONDS);
@@ -84,13 +114,7 @@ public class RedisQueueWorker implements Runnable {
                     continue;
                 }
 
-                // 댓글 카운트 갱신 큐 처리
-                postIdStr = (String) redisTemplate.opsForList().leftPop(COMMENT_COUNT_UPDATE_QUEUE, 1, TimeUnit.SECONDS);
-                if (postIdStr != null) {
-                    Long postId = Long.parseLong(postIdStr);
-                    commentCountFlusher.flushCommentCountToDatabase(postId);
-                    continue;
-                }
+
 
                 // 조회수 갱신 큐 처리
                 String viewCountPostIdStr = (String) redisTemplate.opsForList().leftPop(VIEW_COUNT_UPDATE_QUEUE, 1, TimeUnit.SECONDS);

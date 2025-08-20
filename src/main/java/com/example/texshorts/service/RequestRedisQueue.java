@@ -1,8 +1,6 @@
 package com.example.texshorts.service;
 
-import com.example.texshorts.dto.message.PostCreationMessage;
-import com.example.texshorts.dto.message.UserInterestTagQueueMessage;
-import com.example.texshorts.dto.message.ViewHistorySaveMessage;
+import com.example.texshorts.dto.message.*;
 import com.example.texshorts.entity.TagActionType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -10,9 +8,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
-
-import java.time.Duration;
-import java.util.List;
 
 
 @Service
@@ -24,12 +19,15 @@ public class RequestRedisQueue {
 
     private static final String CREATE_QUEUE = "create:post:queue";
     private static final String DELETE_QUEUE = "delete:post:queue";
+
+    private static final String COMMENT_CREATE_QUEUE = "create:comment:queue";
+    private static final String REPLY_COMMENT_CREATE_QUEUE = "create:reply:comment:queue";
+    private static final String COMMENT_DELETE_QUEUE = "delete:comment:queue";
+
     private static final String LIKE_COUNT_UPDATE_QUEUE = "update:like_count:queue";
-    private static final String COMMENT_COUNT_UPDATE_QUEUE = "update:commentCount:queue";
     private static final String VIEW_COUNT_UPDATE_QUEUE = "update:viewCount:queue";
     private static final String USER_INTEREST_TAG_QUEUE = "update:userInterestTag:queue";
     private static final String VIEW_HISTORY_SAVE_QUEUE = "update:viewHistorySave:queue";
-
 
     private static final Logger logger = LoggerFactory.getLogger(RequestRedisQueue.class);
 
@@ -41,14 +39,26 @@ public class RequestRedisQueue {
     }
 
     // 게시물 삭제 큐 요청
-    public void enqueuePostForDeletion(Long postId) {
-        redisTemplate.opsForList().rightPush(DELETE_QUEUE, String.valueOf(postId));
+    public void enqueuePostDeletion(PostDeleteMessage msg) {
+        redisTemplate.opsForList().rightPush(DELETE_QUEUE, msg);
         redisQueueWorker.trigger();
     }
 
-    // 댓글 갯수 조회 큐 요청
-    public void enqueueCommentCountUpdate(Long postId) {
-        redisTemplate.opsForList().rightPush(COMMENT_COUNT_UPDATE_QUEUE, String.valueOf(postId));
+    // 댓글 생성 큐 요청
+    public void enqueueCommentCreation(CommentCreationMessage msg) {
+        redisTemplate.opsForList().rightPush(COMMENT_CREATE_QUEUE, msg);
+        redisQueueWorker.trigger();
+    }
+    
+    // 답글 생성 큐 요청
+    public void enqueueReplyCommentCreation(ReplyCommentCreationMessage msg) {
+        redisTemplate.opsForList().rightPush(REPLY_COMMENT_CREATE_QUEUE, msg);
+        redisQueueWorker.trigger();
+    }
+
+    // 댓글 삭제 큐 요청
+    public void enqueueCommentDeletion(CommentDeleteMessage msg) {
+        redisTemplate.opsForList().rightPush(COMMENT_DELETE_QUEUE, msg);
         redisQueueWorker.trigger();
     }
 
