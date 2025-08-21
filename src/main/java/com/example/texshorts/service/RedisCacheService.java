@@ -1,5 +1,6 @@
 package com.example.texshorts.service;
 
+import com.example.texshorts.dto.CommentListResponseDTO;
 import com.example.texshorts.dto.CommentResponseDTO;
 import com.example.texshorts.dto.PostResponseDTO;
 import com.example.texshorts.entity.ReactionType;
@@ -180,17 +181,33 @@ public class RedisCacheService {
     }
 
     // === 댓글 목록 캐싱 ===
-    public List<CommentResponseDTO> getCachedRootComments(Long postId) {
-        return getListAs(COMMENT_LIST_KEY_PREFIX + postId, CommentResponseDTO.class);
+//    public List<CommentResponseDTO> getCachedRootComments(Long postId) {
+//        return getListAs(COMMENT_LIST_KEY_PREFIX + postId, CommentResponseDTO.class);
+//    }
+
+    // 캐시에서 DTO 전체를 꺼내는 메소드
+    public CommentListResponseDTO getCachedRootCommentsDTO(Long postId) {
+        String json = get(COMMENT_LIST_KEY_PREFIX + postId);
+        if (json == null) return null;
+
+        try {
+            return objectMapper.readValue(json, CommentListResponseDTO.class);
+        } catch (Exception e) {
+            logger.warn("Redis JSON DTO 역직렬화 실패: {}", e.getMessage());
+            return null;
+        }
     }
 
-    public void cacheRootComments(Long postId, List<CommentResponseDTO> comments) {
-        setAs(COMMENT_LIST_KEY_PREFIX + postId, comments, COMMENT_TTL);
+
+    // 캐시에 DTO 전체 저장
+    public void cacheRootComments(Long postId, CommentListResponseDTO dto) {
+        setAs(COMMENT_LIST_KEY_PREFIX + postId, dto, COMMENT_TTL);
     }
 
     public void evictRootCommentList(Long postId) {
         delete(COMMENT_LIST_KEY_PREFIX + postId);
     }
+
 
     // === 답글 목록 캐싱 ===
     public List<CommentResponseDTO> getCachedReplies(Long parentCommentId) {

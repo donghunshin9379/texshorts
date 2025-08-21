@@ -53,6 +53,7 @@ public class Comment {
 
     private LocalDateTime updatedAt = LocalDateTime.now();
 
+
     public static Comment createRootComment(Post post, User user, String content) {
         Comment comment = new Comment();
         comment.setPost(post);

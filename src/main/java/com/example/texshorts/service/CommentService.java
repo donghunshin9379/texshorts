@@ -22,12 +22,14 @@ public class CommentService {
     private static final Logger logger = LoggerFactory.getLogger(CommentService.class);
 
     /** 루트 댓글 조회 */
+    // 특정 게시물의 전체댓글을 가져오고 캐시 또한 전체저장(물론 TTL)
     public CommentListResponseDTO getRootComments(Long postId) {
         List<CommentResponseDTO> dtoList = commentRepository.findRootCommentDTOs(postId);
         dtoList.forEach(dto -> dto.setReplies(List.of()));
-        // 캐시 저장(새로고침 대응)
-        redisCacheService.cacheRootComments(postId, dtoList);
-        return new CommentListResponseDTO(dtoList);
+        CommentListResponseDTO responseDTO = new CommentListResponseDTO(dtoList);
+        // 캐시에 DTO 전체 저장 (lastCommentId 포함)
+        redisCacheService.cacheRootComments(postId, responseDTO);
+        return responseDTO;
     }
 
     /** 답글 목록 조회 */
@@ -41,15 +43,16 @@ public class CommentService {
 
     /** [댓글 새로고침] 기존댓글(캐시) + 최신댓글 */
     public List<CommentResponseDTO> refreshRootComments(Long postId, Long lastCommentId) {
-        List<CommentResponseDTO> cached = redisCacheService.getCachedRootComments(postId);
-        if (cached == null) {
-            cached = getRootComments(postId).getComments();
-        }
+        CommentListResponseDTO cachedDTO = redisCacheService.getCachedRootCommentsDTO(postId);
+        List<CommentResponseDTO> cached = cachedDTO != null ? cachedDTO.getComments() : getRootComments(postId).getComments();
+
         List<CommentResponseDTO> newComments = commentRepository.findRootCommentsAfter(postId, lastCommentId);
         List<CommentResponseDTO> combined = new ArrayList<>(cached);
+
         combined.addAll(newComments);
         return combined;
     }
+
 
     /** [답글 새로고침] 기존댓글(캐시) + 최신댓글*/
     public List<CommentResponseDTO> refreshReplies(Long parentCommentId, Long lastReplyId) {

@@ -23,8 +23,6 @@ public class Post {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-
-
     @Column(name = "view_count", nullable = false)
     private int viewCount = 0;
 
@@ -41,7 +39,7 @@ public class Post {
     private String location;
 
     @Column(nullable = false)
-    private String visibility; // 예: "전체 공개", "구독자만", "비공개"
+    private String visibility;
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;

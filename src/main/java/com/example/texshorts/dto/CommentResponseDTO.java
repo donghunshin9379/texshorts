@@ -1,6 +1,5 @@
 package com.example.texshorts.dto;
 
-import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -57,8 +56,6 @@ public class CommentResponseDTO {
     public void setReplies(List<CommentResponseDTO> replies) {
         this.replies = replies;
     }
-
-
 
 
 

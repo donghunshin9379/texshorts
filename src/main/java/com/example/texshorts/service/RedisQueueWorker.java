@@ -1,6 +1,8 @@
 package com.example.texshorts.service;
 
 import com.example.texshorts.component.*;
+import com.example.texshorts.dto.CommentListResponseDTO;
+import com.example.texshorts.dto.CommentResponseDTO;
 import com.example.texshorts.dto.message.*;
 import com.example.texshorts.entity.TagActionType;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -29,6 +31,8 @@ public class RedisQueueWorker implements Runnable {
     private final PopularFeedRefresher popularFeedRefresher;
     private final ReactionCountFlusher reactionCountFlusher;
     private final ViewHistoryWorker viewHistoryWorker;
+    private final CommentService commentService;
+    private final RedisCacheService redisCacheService;
 
     private static final String CREATE_QUEUE = "create:post:queue";
     private static final String DELETE_QUEUE = "delete:post:queue";
@@ -86,6 +90,13 @@ public class RedisQueueWorker implements Runnable {
                 Object commentCreationMessageObj = redisTemplate.opsForList().leftPop(COMMENT_CREATE_QUEUE, 1, TimeUnit.SECONDS);
                 if (commentCreationMessageObj instanceof CommentCreationMessage msg) {
                     commentCreationService.createCommentFromMessage(msg);
+                    CommentListResponseDTO cachedDTO = redisCacheService.getCachedRootCommentsDTO(msg.getPostId());
+                    Long lastCommentId = cachedDTO != null ? cachedDTO.getLastCommentId() : null;
+
+                    // 3️⃣ 새로고침: DB + 캐시 반영
+                    List<CommentResponseDTO> combined = commentService.refreshRootComments(msg.getPostId(), lastCommentId);
+                    // 4️⃣ 최신 상태로 캐시 업데이트
+                    redisCacheService.cacheRootComments(msg.getPostId(), new CommentListResponseDTO(combined));
                     continue;
                 }
 

@@ -26,7 +26,7 @@ public class CommentCreationService  {
     @Transactional
     public void createCommentFromMessage(CommentCreationMessage msg) {
         // 1. 게시물 조회
-        Post post = postRepository.findById(msg.getPostId())
+        Post post = postRepository.findById (msg.getPostId())
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 게시물입니다."));
 
         // 2. 사용자 조회
