@@ -44,10 +44,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         // 로그인, 회원가입, 아이디 중복확인 등 필터 제외할 경로 추가
         if ((path.startsWith("/api/auth/") && !path.equals("/api/auth/validate"))
                 || path.equals("/api/check-username")
-                || path.equals("/api/check-nickname")) {
+                || path.equals("/api/check-nickname")
+                || path.startsWith("/ws")
+        ) {
             filterChain.doFilter(request, response);
             return;
         }
+
 
 
         logger.info("[JWT 필터] 요청 URI : {}", path);

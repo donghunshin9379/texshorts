@@ -7,16 +7,19 @@ import com.example.texshorts.dto.ReplyCommentListResponseDTO;
 import com.example.texshorts.dto.message.CommentCreationMessage;
 import com.example.texshorts.dto.message.CommentDeleteMessage;
 import com.example.texshorts.dto.message.ReplyCommentCreationMessage;
+import com.example.texshorts.entity.Comment;
+import com.example.texshorts.repository.CommentRepository;
 import com.example.texshorts.service.CommentService;
+import com.example.texshorts.service.RedisCacheService;
 import com.example.texshorts.service.RequestRedisQueue;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.redis.cache.RedisCache;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.ArrayList;
 import java.util.List;
 
 
@@ -60,13 +63,18 @@ public class CommentController {
 
     // 댓글 목록 조회
     @GetMapping("/get/root")
-    public ResponseEntity<CommentListResponseDTO> getRootComments(@RequestParam Long postId) {
-        CommentListResponseDTO response = commentService.getRootComments(postId);
-        if (response.getComments().isEmpty()) {
-            return ResponseEntity.status(204).build();
-        }
+    public ResponseEntity<CommentListResponseDTO> getRootComments(
+            @RequestParam Long postId,
+            @RequestParam(required = false) Long lastCommentId
+    ) {
+        List<CommentResponseDTO> dtos = commentService.getComments(postId, lastCommentId);
+        CommentListResponseDTO response = new CommentListResponseDTO(dtos,
+                dtos.isEmpty() ? null : dtos.get(dtos.size() - 1).getId()
+        );
+
         return ResponseEntity.ok(response);
     }
+
 
     // 답글 목록 조회
     @GetMapping("/get/replies")
@@ -113,5 +121,6 @@ public class CommentController {
     }
 
 
-
 }
+
+

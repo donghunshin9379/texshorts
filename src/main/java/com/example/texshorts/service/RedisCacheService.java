@@ -16,6 +16,7 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Supplier;
@@ -181,27 +182,35 @@ public class RedisCacheService {
     }
 
     // === 댓글 목록 캐싱 ===
-//    public List<CommentResponseDTO> getCachedRootComments(Long postId) {
-//        return getListAs(COMMENT_LIST_KEY_PREFIX + postId, CommentResponseDTO.class);
-//    }
-
-    // 캐시에서 DTO 전체를 꺼내는 메소드
-    public CommentListResponseDTO getCachedRootCommentsDTO(Long postId) {
-        String json = get(COMMENT_LIST_KEY_PREFIX + postId);
-        if (json == null) return null;
-
+    public void cacheRootComments(Long postId, List<CommentResponseDTO> commentList) {
+        String key = "post:" + postId + ":comments";
         try {
-            return objectMapper.readValue(json, CommentListResponseDTO.class);
+            setAs(key, commentList, COMMENT_TTL);
         } catch (Exception e) {
-            logger.warn("Redis JSON DTO 역직렬화 실패: {}", e.getMessage());
-            return null;
+            logger.warn("댓글 캐시 저장 실패: {}", e.getMessage());
         }
     }
 
+    // 댓글 추가
+    public void appendRootComment(Long postId, CommentResponseDTO dto) {
+        String key = "post:" + postId + ":comments";
+        try {
+            // 기존 리스트 가져오기
+            List<CommentResponseDTO> list = getListAs(key, CommentResponseDTO.class);
+            if (list == null) list = new ArrayList<>();
+            list.add(dto);
+            // 리스트 다시 저장
+            setAs(key, list, COMMENT_TTL);
+            logger.warn("댓글 append 성공: {}", list);
+            
+        } catch (Exception e) {
+            logger.warn("댓글 append 실패: {}", e.getMessage());
+        }
+    }
 
-    // 캐시에 DTO 전체 저장
-    public void cacheRootComments(Long postId, CommentListResponseDTO dto) {
-        setAs(COMMENT_LIST_KEY_PREFIX + postId, dto, COMMENT_TTL);
+    public List<CommentResponseDTO> getRootCommentList(Long postId) {
+        List<CommentResponseDTO> list = getListAs("post:" + postId + ":comments", CommentResponseDTO.class);
+        return list != null ? list : new ArrayList<>();
     }
 
     public void evictRootCommentList(Long postId) {

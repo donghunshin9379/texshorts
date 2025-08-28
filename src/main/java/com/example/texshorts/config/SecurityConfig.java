@@ -74,7 +74,8 @@ public class SecurityConfig {
                                 "/v2/api-docs/**",
                                 "/swagger-resources/**",
                                 "/webjars/**",
-                                "/thumbnails/**"
+                                "/thumbnails/**",
+                                "/ws/**"
                         ).permitAll()
 
                                 // 브라우저 preflight(OPTIONS) 허용
@@ -110,10 +111,13 @@ public class SecurityConfig {
         configuration.setAllowCredentials(true);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/ws/**", configuration);
         source.registerCorsConfiguration("/**", configuration);
 
         return source;
     }
+
+
 
 
 }
