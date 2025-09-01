@@ -65,45 +65,19 @@ public class CommentController {
     @GetMapping("/get/root")
     public ResponseEntity<CommentListResponseDTO> getRootComments(
             @RequestParam Long postId,
-            @RequestParam(required = false) Long lastCommentId
-    ) {
-        List<CommentResponseDTO> dtos = commentService.getComments(postId, lastCommentId);
-        CommentListResponseDTO response = new CommentListResponseDTO(dtos,
-                dtos.isEmpty() ? null : dtos.get(dtos.size() - 1).getId()
-        );
-
+            @RequestParam(required = false) Long lastCommentId) {
+        CommentListResponseDTO response = commentService.getComments(postId, lastCommentId);
         return ResponseEntity.ok(response);
     }
-
 
     // 답글 목록 조회
     @GetMapping("/get/replies")
-    public ResponseEntity<ReplyCommentListResponseDTO> getReplyComments(@RequestParam Long parentCommentId) {
-        ReplyCommentListResponseDTO response = commentService.getReplies(parentCommentId);
-        if (response.getReplies().isEmpty()) {
-            return ResponseEntity.status(204).build();
-        }
-        return ResponseEntity.ok(response);
-    }
-
-    // 댓글 새로고침
-    @GetMapping("/refresh/root")
-    public ResponseEntity<List<CommentResponseDTO>> refreshRootComments(
-            @RequestParam Long postId,
-            @RequestParam(required = false) Long lastCommentId
-    ) {
-        List<CommentResponseDTO> combined = commentService.refreshRootComments(postId, lastCommentId);
-        return ResponseEntity.ok(combined);
-    }
-
-    // 답글 새로고침
-    @GetMapping("/refresh/replies")
-    public ResponseEntity<List<CommentResponseDTO>> refreshReplyComments(
+    public ResponseEntity<ReplyCommentListResponseDTO> getReplies(
             @RequestParam Long parentCommentId,
             @RequestParam(required = false) Long lastReplyId
     ) {
-        List<CommentResponseDTO> combined = commentService.refreshReplies(parentCommentId, lastReplyId);
-        return ResponseEntity.ok(combined);
+        ReplyCommentListResponseDTO response = commentService.getReplies(parentCommentId, lastReplyId);
+        return ResponseEntity.ok(response);
     }
 
     // 댓글 갯수

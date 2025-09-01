@@ -1,6 +1,5 @@
 package com.example.texshorts.service;
 
-import com.example.texshorts.dto.CommentListResponseDTO;
 import com.example.texshorts.dto.CommentResponseDTO;
 import com.example.texshorts.dto.PostResponseDTO;
 import com.example.texshorts.entity.ReactionType;
@@ -217,9 +216,8 @@ public class RedisCacheService {
         delete(COMMENT_LIST_KEY_PREFIX + postId);
     }
 
-
     // === 답글 목록 캐싱 ===
-    public List<CommentResponseDTO> getCachedReplies(Long parentCommentId) {
+    public List<CommentResponseDTO> getReplieCommentList(Long parentCommentId) {
         return getListAs(REPLY_LIST_KEY_PREFIX + parentCommentId, CommentResponseDTO.class);
     }
 
