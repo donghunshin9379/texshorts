@@ -8,7 +8,10 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public interface CommentRepository extends JpaRepository<Comment, Long> {
     /** 루트 댓글 (마지막이 최신댓글)*/
@@ -74,7 +77,26 @@ public interface CommentRepository extends JpaRepository<Comment, Long> {
     }
 
 
+    // 특정 게시물의 루트 댓글 ID 리스트
+    @Query("SELECT c.id FROM Comment c WHERE c.post.id = :postId AND c.parent IS NULL AND c.isDeleted = false ORDER BY c.createdAt ASC")
+    List<Long> findRootCommentIdsByPostId(@Param("postId") Long postId);
 
+
+    // 게시물의 모든 답글 ID 매핑: parentCommentId -> List<답글ID>
+    @Query("SELECT c.parent.id AS parentId, c.id AS replyId FROM Comment c WHERE c.post.id = :postId AND c.parent IS NOT NULL AND c.isDeleted = false ORDER BY c.createdAt ASC")
+    List<Object[]> findReplyIdsByPostIdRaw(@Param("postId") Long postId);
+
+    // Map<Long, List<Long>> 형태로 변환할 헬퍼 메소드
+    default Map<Long, List<Long>> findReplyIdsByPostId(Long postId) {
+        List<Object[]> rows = findReplyIdsByPostIdRaw(postId);
+        Map<Long, List<Long>> map = new HashMap<>();
+        for (Object[] row : rows) {
+            Long parentId = (Long) row[0];
+            Long replyId = (Long) row[1];
+            map.computeIfAbsent(parentId, k -> new ArrayList<>()).add(replyId);
+        }
+        return map;
+    }
 
 
 }

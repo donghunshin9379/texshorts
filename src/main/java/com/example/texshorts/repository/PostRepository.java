@@ -1,6 +1,7 @@
 package com.example.texshorts.repository;
 
 import com.example.texshorts.entity.Post;
+import com.example.texshorts.entity.ReactionType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -78,5 +79,7 @@ public interface PostRepository extends JpaRepository<Post, Long> {
 
     // 유저 ID로 게시물 조회, 페이징 적용
     Page<Post> findByUserId(Long userId, Pageable pageable);
+
+
 
 }

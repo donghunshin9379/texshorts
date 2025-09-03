@@ -43,7 +43,14 @@ public class PostReactionController {
         postReactionService.react(postId, user, ReactionType.DISLIKE);
         return ResponseEntity.ok().build();
     }
-    
+
+
+    // 특정 유저 좋아요 기록
+    @GetMapping("/like/status")
+    public boolean hasUserLiked(@RequestParam Long postId,
+                                @AuthenticationPrincipal CustomUserDetails customUserDetails) {
+        return postReactionService.hasUserLiked(postId, customUserDetails.getUserId());
+    }
 
 
 

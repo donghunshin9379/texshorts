@@ -79,10 +79,12 @@ public class PostReactionService {
     }
 
     public Long getLikeCount(Long postId) {
-        return redisCacheService.getPostReactionCount(postId, ReactionType.LIKE,
-                () -> postReactionRepository.countByPostIdAndType(postId, ReactionType.LIKE));
+        return postReactionRepository.countByPostIdAndType(postId, ReactionType.LIKE);
     }
 
 
+    public boolean hasUserLiked(Long postId, Long userId) {
+        return postReactionRepository.existsByPostIdAndUserIdAndType(postId, userId, ReactionType.LIKE);
+    }
 
 }

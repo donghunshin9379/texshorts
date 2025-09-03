@@ -148,10 +148,12 @@ public class RedisQueueWorker implements Runnable {
                 // 인기 피드 갱신 큐 처리
                 String popularFeedSignal = (String) redisTemplate.opsForList().leftPop(POPULAR_FEED_UPDATE_QUEUE, 1, TimeUnit.SECONDS);
                 if (popularFeedSignal != null) {
-                    popularFeedRefresher.refreshPopularFeedCache();
+                    // userId는 공통 캐시용이므로 null
+                    popularFeedRefresher.refreshPopularFeedCache(null);
                     logger.info("인기 피드 캐시 갱신 완료");
                     continue;
                 }
+
 
                 // 시청 기록 갱신 큐 처리
                 Object obj = redisTemplate.opsForList().leftPop(VIEW_HISTORY_SAVE_QUEUE, 1, TimeUnit.SECONDS);

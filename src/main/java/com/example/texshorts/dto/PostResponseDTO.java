@@ -6,7 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.function.Function;
+import java.util.Map;
 
 
 @Data
@@ -26,6 +26,17 @@ public class PostResponseDTO {  /** 게시물 출력용 바디 DTO*/
     private int commentCount;
     private int viewCount;
     private int replyCount;
+
+    // 댓글 ID 리스트 (Lazy load 가능)
+    private List<Long> rootCommentIds;
+
+    // 답글 ID 매핑: parentCommentId -> 답글 ID 리스트
+    private Map<Long, List<Long>> replyIds;
+
+    // 유저별 좋아요/싫어요 상태 (캐시 기반)
+    private Map<Long, Boolean> userLikedMap;
+    private Map<Long, Boolean> userDislikedMap;
+
 
     /**
      * Entity → DTO 변환 메서드

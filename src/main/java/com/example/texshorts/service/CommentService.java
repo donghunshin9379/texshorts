@@ -39,7 +39,10 @@ public class CommentService {
     public ReplyCommentListResponseDTO getReplies(Long parentCommentId, Long lastReplyId) {
         if (lastReplyId == null) {
             List<CommentResponseDTO> cached = redisCacheService.getReplieCommentList(parentCommentId);
-            if (!cached.isEmpty()) return new ReplyCommentListResponseDTO(cached);
+
+            if (cached != null && !cached.isEmpty()) {
+                return new ReplyCommentListResponseDTO(cached);
+            }
 
             List<CommentResponseDTO> dtoList = commentRepository.findReplyDTOs(parentCommentId);
             redisCacheService.cacheReplies(parentCommentId, dtoList);
@@ -50,12 +53,12 @@ public class CommentService {
         }
     }
 
-    public int getCommentCountCached(Long postId) {
-        return commentRepository.countByPostIdAndParentIsNullAndIsDeletedFalse(postId);
 
+    public int getCommentCount(Long postId) {
+        return commentRepository.countByPostIdAndParentIsNullAndIsDeletedFalse(postId);
     }
 
-    public int getReplyCountCached(Long parentCommentId) {
+    public int getReplyCount(Long parentCommentId) {
         return commentRepository.countByParentIdAndIsDeletedFalse(parentCommentId);
     }
 

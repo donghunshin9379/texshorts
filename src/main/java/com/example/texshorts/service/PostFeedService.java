@@ -78,9 +78,9 @@ public class PostFeedService {
         if (cached.isEmpty()) {
             List<Post> posts = fetchPostsFromDb(type, fetchSize, userId);
             List<PostResponseDTO> dtos = posts.stream()
-                    .map(post -> toDto(post, serverUrl))
-                    .map(this::attachRealtimeCounts)
-                    .toList();
+                    .map(post -> toDto(post, serverUrl, userId)) // userId 전달
+                    .toList(); // attachRealtimeCounts는 이미 toDto 내부에서 호출됨
+
 
             redisCacheService.cachePostList(0, fetchSize, dtos, cacheKeyPrefix);
             logger.info("DB에서 캐시 생성, FeedType: {}, size: {}", type, dtos.size());
@@ -153,7 +153,7 @@ public class PostFeedService {
     }
 
     /** Post -> DTO 변환 */
-    public PostResponseDTO toDto(Post post, String serverUrl) {
+    public PostResponseDTO toDto(Post post, String serverUrl, Long userId) {
         String thumbnailPath = post.getThumbnailPath();
         if (!(thumbnailPath.startsWith("http://") || thumbnailPath.startsWith("https://"))) {
             thumbnailPath = serverUrl + "/thumbnails/" + thumbnailPath;
@@ -169,8 +169,22 @@ public class PostFeedService {
         dto.setContentLines(contentToLines(post.getContent()));
         dto.setTags(post.getTags());
 
-        return attachRealtimeCounts(dto);
+        // 실시간 카운트 attach
+        attachRealtimeCounts(dto);
+
+        // ✅ 캐시 기반 댓글/답글 ID 세팅
+        dto.setRootCommentIds(redisCacheService.getRootCommentIds(post.getId()));
+        dto.setReplyIds(redisCacheService.getReplyIds(post.getId()));
+
+        // ✅ 유저별 리액션 상태 세팅
+        if (userId != null) {
+            dto.setUserLikedMap(Map.of(userId, redisCacheService.hasUserLiked(post.getId(), userId)));
+            dto.setUserDislikedMap(Map.of(userId, redisCacheService.hasUserDisliked(post.getId(), userId)));
+        }
+
+        return dto;
     }
+
 
     /** 본 게시물 TTL 처리 */
     public void markPostAsSeen(Long userId, Long postId) {

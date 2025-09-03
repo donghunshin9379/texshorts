@@ -4,6 +4,7 @@ import com.example.texshorts.dto.CommentResponseDTO;
 import com.example.texshorts.dto.PostResponseDTO;
 import com.example.texshorts.entity.ReactionType;
 import com.example.texshorts.repository.CommentRepository;
+import com.example.texshorts.repository.PostReactionRepository;
 import com.example.texshorts.repository.PostRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -15,9 +16,7 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.function.Supplier;
 
 @Service
@@ -29,6 +28,7 @@ public class RedisCacheService {
     private final CommentRepository commentRepository;
     private final ObjectMapper objectMapper;
     private final PostRepository postRepository;
+    private final PostReactionRepository postReactionRepository;
 
     private static final Duration DEFAULT_TTL = Duration.ofMinutes(30);
     private static final Duration COMMENT_TTL = Duration.ofMinutes(3);
@@ -90,6 +90,19 @@ public class RedisCacheService {
             return null;
         }
     }
+
+    // TypeReference 기반 Map 역직렬화
+    public <K, V> Map<K, V> getMapAs(String key, TypeReference<Map<K, V>> typeReference) {
+        String json = get(key);
+        if (json == null) return null;
+        try {
+            return objectMapper.readValue(json, typeReference);
+        } catch (Exception e) {
+            logger.warn("Map 역직렬화 실패: {}", e.getMessage());
+            return null;
+        }
+    }
+
 
     // 객체 -> JSON 직렬화 후 저장
     public <T> void setAs(String key, T value) {
@@ -207,6 +220,9 @@ public class RedisCacheService {
         }
     }
 
+
+
+
     public List<CommentResponseDTO> getRootCommentList(Long postId) {
         List<CommentResponseDTO> list = getListAs("post:" + postId + ":comments", CommentResponseDTO.class);
         return list != null ? list : new ArrayList<>();
@@ -228,6 +244,8 @@ public class RedisCacheService {
     public void evictReplyList(Long parentCommentId) {
         delete(REPLY_LIST_KEY_PREFIX + parentCommentId);
     }
+
+
 
     // === Post Reaction 캐시 관련 ===
     private String getPostReactionKey(Long postId, ReactionType type) {
@@ -421,5 +439,95 @@ public class RedisCacheService {
         redisTemplate.delete(key);
     }
 
+
+
+
+
+
+    // ✅ 루트 댓글 ID 리스트 조회
+    public List<Long> getRootCommentIds(Long postId) {
+        String key = "post:" + postId + ":rootCommentIds";
+
+        List<Long> cached = getListAs(key, Long.class); // 직렬화 활용
+        if (cached != null) return cached;
+
+        List<Long> ids = commentRepository.findRootCommentIdsByPostId(postId);
+        setAs(key, ids, COMMENT_TTL); // 캐시 저장
+        return ids;
+    }
+
+
+
+    // ✅ 답글 ID 매핑 조회
+    public Map<Long, List<Long>> getReplyIds(Long postId) {
+        String key = "post:" + postId + ":replyIds";
+
+        Map<Long, List<Long>> cached = getMapAs(key, new TypeReference<>() {});
+        if (cached != null) return cached;
+
+        Map<Long, List<Long>> replyMap = commentRepository.findReplyIdsByPostId(postId);
+        setAs(key, replyMap, COMMENT_TTL);
+        return replyMap;
+    }
+
+
+
+
+    // ✅ 유저별 좋아요 여부 조회
+    public boolean hasUserLiked(Long postId, Long userId) {
+        String key = POST_REACTION_KEY_PREFIX + postId + ":likedUserIds";
+        Boolean result = redisTemplate.opsForSet().isMember(key, userId.toString());
+        if (result != null) return result;
+
+        // DB fallback
+        boolean liked = postReactionRepository.existsByPostIdAndUserIdAndType(postId, userId, ReactionType.LIKE); // repository 쿼리 필요
+        cacheUserReaction(postId, userId, liked, false); // disliked=false는 임시
+        return liked;
+    }
+
+    // ✅ 유저별 싫어요 여부 조회
+    public boolean hasUserDisliked(Long postId, Long userId) {
+        String key = POST_REACTION_KEY_PREFIX + postId + ":dislikedUserIds";
+        Boolean result = redisTemplate.opsForSet().isMember(key, userId.toString());
+        if (result != null) return result;
+
+        // DB fallback
+        boolean disliked = postReactionRepository.existsByPostIdAndUserIdAndType(postId, userId, ReactionType.DISLIKE);
+        cacheUserReaction(postId, userId, false, disliked); // liked=false는 임시
+        return disliked;
+    }
+
+    // ✅ 루트 댓글 ID 캐시 저장
+    public void cacheRootCommentIds(Long postId, List<Long> commentIds) {
+        String key = "post:" + postId + ":rootCommentIds";
+        setAs(key, commentIds, COMMENT_TTL);
+//        redisTemplate.delete(key);
+//        for (Long id : commentIds) {
+//            redisTemplate.opsForList().rightPush(key, id.toString());
+//        }
+//        redisTemplate.expire(key, COMMENT_TTL);
+    }
+
+    // ✅ 답글 ID 매핑 캐시 저장
+    public void cacheReplyIds(Long postId, Map<Long, List<Long>> replyMap) {
+        String key = "post:" + postId + ":replyIds";
+        setAs(key, replyMap, COMMENT_TTL); // 직렬화로 저장
+    }
+
+
+    // ✅ 유저 좋아요/싫어요 캐시 저장
+    public void cacheUserReaction(Long postId, Long userId, boolean liked, boolean disliked) {
+        String likeKey = POST_REACTION_KEY_PREFIX + postId + ":likedUserIds";
+        String dislikeKey = POST_REACTION_KEY_PREFIX + postId + ":dislikedUserIds";
+
+        if (liked) redisTemplate.opsForSet().add(likeKey, userId.toString());
+        else redisTemplate.opsForSet().remove(likeKey, userId.toString());
+
+        if (disliked) redisTemplate.opsForSet().add(dislikeKey, userId.toString());
+        else redisTemplate.opsForSet().remove(dislikeKey, userId.toString());
+
+        redisTemplate.expire(likeKey, DEFAULT_TTL);
+        redisTemplate.expire(dislikeKey, DEFAULT_TTL);
+    }
 
 }

@@ -20,7 +20,7 @@ public class PopularFeedRefresher {
     private final RedisCacheService redisCacheService;
     private final PostFeedService postFeedService;
 
-    public void refreshPopularFeedCache() {
+    public void refreshPopularFeedCache(Long userId) {
         int page = 0;
         int size = 20;
 
@@ -33,8 +33,9 @@ public class PopularFeedRefresher {
         String serverUrl = "http://localhost:8080";
 
         List<PostResponseDTO> popularPosts = postRepository.findAll(pageable).stream()
-                .map(post -> postFeedService.toDto(post, serverUrl))
+                .map(post -> postFeedService.toDto(post, serverUrl, null)) // userId 없음
                 .toList();
+
 
 
         redisCacheService.cachePostList(page, size, popularPosts, RedisCacheService.POPULAR_POST_LIST_KEY_PREFIX);

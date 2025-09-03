@@ -1,26 +1,19 @@
 package com.example.texshorts.controller;
 
 import com.example.texshorts.dto.CommentListResponseDTO;
-import com.example.texshorts.dto.CommentResponseDTO;
 import com.example.texshorts.custom.CustomUserDetails;
 import com.example.texshorts.dto.ReplyCommentListResponseDTO;
 import com.example.texshorts.dto.message.CommentCreationMessage;
 import com.example.texshorts.dto.message.CommentDeleteMessage;
 import com.example.texshorts.dto.message.ReplyCommentCreationMessage;
-import com.example.texshorts.entity.Comment;
-import com.example.texshorts.repository.CommentRepository;
 import com.example.texshorts.service.CommentService;
-import com.example.texshorts.service.RedisCacheService;
 import com.example.texshorts.service.RequestRedisQueue;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.data.redis.cache.RedisCache;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 
 @RestController
@@ -74,8 +67,7 @@ public class CommentController {
     @GetMapping("/get/replies")
     public ResponseEntity<ReplyCommentListResponseDTO> getReplies(
             @RequestParam Long parentCommentId,
-            @RequestParam(required = false) Long lastReplyId
-    ) {
+            @RequestParam(required = false) Long lastReplyId) {
         ReplyCommentListResponseDTO response = commentService.getReplies(parentCommentId, lastReplyId);
         return ResponseEntity.ok(response);
     }
@@ -83,14 +75,14 @@ public class CommentController {
     // 댓글 갯수
     @GetMapping("/count/root")
     public ResponseEntity<Integer> getCommentCount(@RequestParam Long postId) {
-        int count = commentService.getCommentCountCached(postId);
+        int count = commentService.getCommentCount(postId);
         return ResponseEntity.ok(count);
     }
 
     // 답글 갯수
     @GetMapping("/count/replies")
-    public ResponseEntity<Integer> getReplyCountCached(@RequestParam Long parentCommentId) {
-        int count = commentService.getReplyCountCached(parentCommentId);
+    public ResponseEntity<Integer> getReplyCount(@RequestParam Long parentCommentId) {
+        int count = commentService.getReplyCount(parentCommentId);
         return ResponseEntity.ok(count);
     }
 
