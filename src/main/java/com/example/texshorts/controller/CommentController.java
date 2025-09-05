@@ -2,6 +2,7 @@ package com.example.texshorts.controller;
 
 import com.example.texshorts.dto.CommentListResponseDTO;
 import com.example.texshorts.custom.CustomUserDetails;
+import com.example.texshorts.dto.CommentResponseDTO;
 import com.example.texshorts.dto.ReplyCommentListResponseDTO;
 import com.example.texshorts.dto.message.CommentCreationMessage;
 import com.example.texshorts.dto.message.CommentDeleteMessage;
@@ -14,6 +15,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 
 @RestController
@@ -85,6 +88,15 @@ public class CommentController {
         int count = commentService.getReplyCount(parentCommentId);
         return ResponseEntity.ok(count);
     }
+
+    // CommentID들로 검색(이미 redis에 id있음)
+    @PostMapping("/byIds")
+    public ResponseEntity<CommentListResponseDTO> getCommentsByIds(@RequestBody List<Long> ids) {
+        List<CommentResponseDTO> comments = commentService.getCommentsByIds(ids);
+        return ResponseEntity.ok(new CommentListResponseDTO(comments));
+    }
+
+
 
 
 }

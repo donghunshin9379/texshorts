@@ -22,46 +22,16 @@ public class PostResponseDTO {  /** 게시물 출력용 바디 DTO*/
     private String tags;
     private Long postId;
 
-    private int likeCount;
-    private int commentCount;
     private int viewCount;
+    private int likeCount;
+    private long dislikeCount;
+    private int commentCount;
     private int replyCount;
+    private boolean hasLiked;
+    private boolean hasDisliked;
 
-    // 댓글 ID 리스트 (Lazy load 가능)
     private List<Long> rootCommentIds;
-
-    // 답글 ID 매핑: parentCommentId -> 답글 ID 리스트
     private Map<Long, List<Long>> replyIds;
-
-    // 유저별 좋아요/싫어요 상태 (캐시 기반)
-    private Map<Long, Boolean> userLikedMap;
-    private Map<Long, Boolean> userDislikedMap;
-
-
-    /**
-     * Entity → DTO 변환 메서드
-     * @param post 게시물 엔티티
-     * @param urlGenerator 썸네일 파일명을 URL로 변환하는 함수
-     */
-//    public static PostResponseDTO fromEntity(Post post, Function<String, String> urlGenerator) {
-//        PostResponseDTO dto = new PostResponseDTO();
-//
-//        dto.setNickname(post.getUser().getNickname());
-//        dto.setTitle(post.getTitle());
-//        dto.setContent(post.getContent());
-//        dto.setThumbnailUrl(urlGenerator.apply(post.getThumbnailPath()));
-//        dto.setCreatedAt(post.getCreatedAt());
-//        dto.setTags(post.getTags());
-//        dto.setPostId(post.getId());
-//
-//        // contentLines가 있다면, 예를 들어 content를 줄 단위로 나누기
-//        if(post.getContent() != null) {
-//            dto.setContentLines(List.of(post.getContent().split("\n")));
-//        }
-//
-//        return dto;
-//    }
-
 
     /**
      * 썸네일 없이 DTO 변환 (마이페이지 전용 등)

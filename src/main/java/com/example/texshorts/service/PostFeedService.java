@@ -50,7 +50,7 @@ public class PostFeedService {
                 ))
                 .values()
                 .stream()
-                .collect(Collectors.toCollection(ArrayList::new)); // mutable 리스트 생성
+                .collect(Collectors.toCollection(ArrayList::new));
 
 
         logger.info("중복 제거 후 combined size: {}", combined.size());
@@ -79,7 +79,7 @@ public class PostFeedService {
             List<Post> posts = fetchPostsFromDb(type, fetchSize, userId);
             List<PostResponseDTO> dtos = posts.stream()
                     .map(post -> toDto(post, serverUrl, userId)) // userId 전달
-                    .toList(); // attachRealtimeCounts는 이미 toDto 내부에서 호출됨
+                    .toList();
 
 
             redisCacheService.cachePostList(0, fetchSize, dtos, cacheKeyPrefix);
@@ -109,27 +109,16 @@ public class PostFeedService {
         }
     }
 
-    /** 실시간 카운트 attach */
-    private PostResponseDTO attachRealtimeCounts(PostResponseDTO dto) {
+    /** 게시물 counts 모음 */
+    private PostResponseDTO populateCounts(PostResponseDTO dto) {
         Long postId = dto.getPostId();
-
-        // 좋아요
-        Long likeCount = redisCacheService.getPostReactionCount(
-                postId, ReactionType.LIKE,
-                () -> postRepository.findById(postId).map(post -> (long) post.getLikeCount()).orElse(0L)
-        );
-        dto.setLikeCount(likeCount.intValue());
-
-        // 댓글/답글
+        dto.setLikeCount(redisCacheService.getPostReactionCount(postId, ReactionType.LIKE).intValue());
         dto.setCommentCount(redisCacheService.getRootCommentCount(postId));
         dto.setReplyCount(redisCacheService.getReplyCount(postId));
-
-        // 조회수
-        Long viewCount = redisCacheService.getViewCount(postId);
-        dto.setViewCount(viewCount != null ? viewCount.intValue() : 0);
-
+        dto.setViewCount(redisCacheService.getViewCount(postId).intValue());
         return dto;
     }
+
 
     /** 캐시에서 Feed 가져오기 */
     private List<PostResponseDTO> getFeedFromCache(FeedType type, int fetchSize, Long userId) {
@@ -168,18 +157,13 @@ public class PostFeedService {
         dto.setCreatedAt(post.getCreatedAt());
         dto.setContentLines(contentToLines(post.getContent()));
         dto.setTags(post.getTags());
-
-        // 실시간 카운트 attach
-        attachRealtimeCounts(dto);
-
-        // ✅ 캐시 기반 댓글/답글 ID 세팅
         dto.setRootCommentIds(redisCacheService.getRootCommentIds(post.getId()));
         dto.setReplyIds(redisCacheService.getReplyIds(post.getId()));
+        populateCounts(dto);
 
-        // ✅ 유저별 리액션 상태 세팅
         if (userId != null) {
-            dto.setUserLikedMap(Map.of(userId, redisCacheService.hasUserLiked(post.getId(), userId)));
-            dto.setUserDislikedMap(Map.of(userId, redisCacheService.hasUserDisliked(post.getId(), userId)));
+            dto.setHasLiked(redisCacheService.hasUserLiked(post.getId(), userId));
+            dto.setHasDisliked(redisCacheService.hasUserDisliked(post.getId(), userId));
         }
 
         return dto;

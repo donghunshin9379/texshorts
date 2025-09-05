@@ -98,5 +98,7 @@ public interface CommentRepository extends JpaRepository<Comment, Long> {
         return map;
     }
 
+    //댓글ID모음 검색
+    List<Comment> findByIdIn(List<Long> ids);
 
 }

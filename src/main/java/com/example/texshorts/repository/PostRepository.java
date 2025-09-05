@@ -80,6 +80,8 @@ public interface PostRepository extends JpaRepository<Post, Long> {
     // 유저 ID로 게시물 조회, 페이징 적용
     Page<Post> findByUserId(Long userId, Pageable pageable);
 
+    @Query("SELECT p.viewCount FROM Post p WHERE p.id = :postId")
+    Long getViewCountByPostId(@Param("postId") Long postId);
 
 
 }

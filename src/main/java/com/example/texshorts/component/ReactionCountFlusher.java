@@ -16,7 +16,7 @@ public class ReactionCountFlusher {
 
     @Transactional
     public void flushLikeCountToDatabase(Long postId) {
-        Long cachedCount = redisCacheService.getPostReactionCount(postId, ReactionType.LIKE, null);
+        Long cachedCount = redisCacheService.getPostReactionCount(postId, ReactionType.LIKE);
         if (cachedCount != null) {
             postRepository.findById(postId).ifPresent(post -> {
                 post.setLikeCount(cachedCount.intValue());

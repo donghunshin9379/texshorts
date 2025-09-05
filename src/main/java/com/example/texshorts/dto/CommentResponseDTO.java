@@ -1,5 +1,6 @@
 package com.example.texshorts.dto;
 
+import com.example.texshorts.entity.Comment;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -53,9 +54,17 @@ public class CommentResponseDTO {
         this.replies = new ArrayList<>();
     }
 
-    public void setReplies(List<CommentResponseDTO> replies) {
-        this.replies = replies;
+    public static CommentResponseDTO fromEntity(Comment comment) {
+        return new CommentResponseDTO(
+                comment.getId(),
+                comment.getContent(),
+                comment.getUser().getId(),
+                comment.getUser().getNickname(),
+                comment.getCreatedAt()
+        );
     }
+
+
 
 
 

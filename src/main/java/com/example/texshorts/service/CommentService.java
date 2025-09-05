@@ -3,13 +3,18 @@ package com.example.texshorts.service;
 import com.example.texshorts.dto.CommentListResponseDTO;
 import com.example.texshorts.dto.CommentResponseDTO;
 import com.example.texshorts.dto.ReplyCommentListResponseDTO;
+import com.example.texshorts.entity.Comment;
 import com.example.texshorts.repository.CommentRepository;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -62,5 +67,23 @@ public class CommentService {
         return commentRepository.countByParentIdAndIsDeletedFalse(parentCommentId);
     }
 
+    // 댓글ID 모음으로 검색
+    public List<CommentResponseDTO> getCommentsByIds(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<Comment> comments = commentRepository.findByIdIn(ids);
+
+        // 캐싱된 순서대로 정렬 (DB 조회는 순서 보장 안 됨)
+        Map<Long, Comment> commentMap = comments.stream()
+                .collect(Collectors.toMap(Comment::getId, c -> c));
+
+        return ids.stream()
+                .map(commentMap::get)
+                .filter(Objects::nonNull)
+                .map(CommentResponseDTO::fromEntity) // DTO 변환
+                .collect(Collectors.toList());
+    }
 
 }

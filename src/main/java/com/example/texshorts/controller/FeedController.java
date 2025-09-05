@@ -26,8 +26,6 @@ public class FeedController {
             @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
         Long userId = userDetails != null ? userDetails.getUserId() : null;
-
-        // 서비스에서 합치고 중복 제거 + 섞기 처리
         List<PostResponseDTO> combined = postFeedService.getCombinedFeed(page, size, userId);
 
         return ResponseEntity.ok(combined);

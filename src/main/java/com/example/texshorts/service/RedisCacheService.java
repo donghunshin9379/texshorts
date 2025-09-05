@@ -33,9 +33,10 @@ public class RedisCacheService {
     private static final Duration DEFAULT_TTL = Duration.ofMinutes(30);
     private static final Duration COMMENT_TTL = Duration.ofMinutes(3);
     private static final Duration VIEWED_POST_TTL = Duration.ofHours(1);
-    /**게시물 피드(캐시) 갱신 주기*/
     public static final Duration POST_LIST_TTL = Duration.ofMinutes(10);
     private static final Duration TAG_NAMES_TTL = Duration.ofHours(1);
+    public static final Duration COUNT_TTL = Duration.ofHours(1); // TTL 1시간 통합
+
 
     private static final String COMMENT_LIST_KEY_PREFIX = "post:comments:";
     private static final String COMMENT_COUNT_KEY_PREFIX = "post:commentCount:";
@@ -151,7 +152,7 @@ public class RedisCacheService {
         if (cached != null) return cached.intValue();
 
         int count = commentRepository.countByPostIdAndParentIsNullAndIsDeletedFalse(postId);
-        redisLongTemplate.opsForValue().setIfAbsent(key, (long) count);
+        redisLongTemplate.opsForValue().setIfAbsent(key, (long) count, COUNT_TTL);
         return count;
     }
 
@@ -177,7 +178,7 @@ public class RedisCacheService {
         if (cached != null) return cached.intValue();
 
         int count = commentRepository.countByParentIdAndIsDeletedFalse(parentCommentId);
-        redisLongTemplate.opsForValue().setIfAbsent(key, (long) count);
+        redisLongTemplate.opsForValue().setIfAbsent(key, (long) count, COUNT_TTL);
         return count;
     }
 
@@ -253,15 +254,21 @@ public class RedisCacheService {
     }
 
     // 게시물(피드) 좋아요 수 get
-    public Long getPostReactionCount(Long postId, ReactionType type, Supplier<Long> dbCountSupplier) {
+    public Long getPostReactionCount(Long postId, ReactionType type) {
         String key = getPostReactionKey(postId, type);
+
+        // 캐시 조회
         Long cached = redisLongTemplate.opsForValue().get(key);
         if (cached != null) return cached;
 
-        Long count = dbCountSupplier.get();
-        redisLongTemplate.opsForValue().setIfAbsent(key, count);
+        // DB fallback
+        Long count = postReactionRepository.countByPostIdAndType(postId, type);
+
+        redisLongTemplate.opsForValue().setIfAbsent(key, count, COUNT_TTL);
+
         return count;
     }
+
 
     public void incrementPostReactionCount(Long postId, ReactionType type) {
         String key = getPostReactionKey(postId, type);
@@ -294,12 +301,12 @@ public class RedisCacheService {
     }
 
 
-    // 조회한 게시물 ID 목록 조회
-    public Set<String> getViewedPostIdSet(Long userId) {
-        String key = VIEWED_USER_POST_PREFIX + userId + ":posts";
-        Set<String> members = redisTemplate.opsForSet().members(key);
-        return members;
-    }
+//    // 조회한 게시물 ID 목록 조회
+//    public Set<String> getViewedPostIdSet(Long userId) {
+//        String key = VIEWED_USER_POST_PREFIX + userId + ":posts";
+//        Set<String> members = redisTemplate.opsForSet().members(key);
+//        return members;
+//    }
 
     // 게시물 조회수 증가 (Redis 카운트 증가)
     public Long incrementViewCount(Long postId) {
@@ -312,9 +319,17 @@ public class RedisCacheService {
     // 게시물(피드) 조회수 get
     public Long getViewCount(Long postId) {
         String key = VIEW_COUNT_PREFIX + postId;
+
         Long cached = redisLongTemplate.opsForValue().get(key);
-        return cached != null ? cached : 0L;
+        if (cached != null) return cached;
+
+        Long count = postRepository.getViewCountByPostId(postId);
+        if (count == null) count = 0L;
+
+        redisLongTemplate.opsForValue().setIfAbsent(key, count, COUNT_TTL);
+        return count;
     }
+
 
 
     // === Post Feed 캐시 관련 ===
@@ -400,12 +415,6 @@ public class RedisCacheService {
         String key = USER_INTEREST_TAGS_PREFIX + userId;
         redisTemplate.opsForSet().remove(key, tag);
     }
-
-    // 캐시 전체 삭제
-    public void evictUserInterestTags(Long userId) {
-        String key = USER_INTEREST_TAGS_PREFIX + userId;
-        redisTemplate.delete(key);
-    }
     
     /** postId 기준 태그네임 캐시 관련 ========================================*/
     // 태그 목록 캐싱용 get
@@ -417,12 +426,10 @@ public class RedisCacheService {
             try {
                 return objectMapper.readValue(cachedJson, new TypeReference<List<String>>() {});
             } catch (JsonProcessingException e) {
-                // 역직렬화 실패 시 로그 기록 후 캐시 삭제
                 redisTemplate.delete(key);
             }
         }
 
-        // 캐시 없거나 역직렬화 실패 시 DB 조회 후 캐싱
         List<String> tagNames = postRepository.findTagNamesByPostId(postId);
         try {
             String json = objectMapper.writeValueAsString(tagNames);
@@ -433,18 +440,7 @@ public class RedisCacheService {
         return tagNames;
     }
 
-    // 필요시 캐시 삭제용 메서드도 추가
-    public void evictTagNamesCache(Long postId) {
-        String key = POST_TAG_NAMES_KEY_PREFIX + postId;
-        redisTemplate.delete(key);
-    }
-
-
-
-
-
-
-    // ✅ 루트 댓글 ID 리스트 조회
+    //루트 댓글 ID 리스트 조회
     public List<Long> getRootCommentIds(Long postId) {
         String key = "post:" + postId + ":rootCommentIds";
 
@@ -456,9 +452,7 @@ public class RedisCacheService {
         return ids;
     }
 
-
-
-    // ✅ 답글 ID 매핑 조회
+    //답글 ID 매핑 조회
     public Map<Long, List<Long>> getReplyIds(Long postId) {
         String key = "post:" + postId + ":replyIds";
 
@@ -470,10 +464,7 @@ public class RedisCacheService {
         return replyMap;
     }
 
-
-
-
-    // ✅ 유저별 좋아요 여부 조회
+    //유저별 좋아요 여부 조회
     public boolean hasUserLiked(Long postId, Long userId) {
         String key = POST_REACTION_KEY_PREFIX + postId + ":likedUserIds";
         Boolean result = redisTemplate.opsForSet().isMember(key, userId.toString());
@@ -485,7 +476,7 @@ public class RedisCacheService {
         return liked;
     }
 
-    // ✅ 유저별 싫어요 여부 조회
+    //유저별 싫어요 여부 조회
     public boolean hasUserDisliked(Long postId, Long userId) {
         String key = POST_REACTION_KEY_PREFIX + postId + ":dislikedUserIds";
         Boolean result = redisTemplate.opsForSet().isMember(key, userId.toString());
@@ -493,29 +484,11 @@ public class RedisCacheService {
 
         // DB fallback
         boolean disliked = postReactionRepository.existsByPostIdAndUserIdAndType(postId, userId, ReactionType.DISLIKE);
-        cacheUserReaction(postId, userId, false, disliked); // liked=false는 임시
+        cacheUserReaction(postId, userId, false, disliked);
         return disliked;
     }
 
-    // ✅ 루트 댓글 ID 캐시 저장
-    public void cacheRootCommentIds(Long postId, List<Long> commentIds) {
-        String key = "post:" + postId + ":rootCommentIds";
-        setAs(key, commentIds, COMMENT_TTL);
-//        redisTemplate.delete(key);
-//        for (Long id : commentIds) {
-//            redisTemplate.opsForList().rightPush(key, id.toString());
-//        }
-//        redisTemplate.expire(key, COMMENT_TTL);
-    }
-
-    // ✅ 답글 ID 매핑 캐시 저장
-    public void cacheReplyIds(Long postId, Map<Long, List<Long>> replyMap) {
-        String key = "post:" + postId + ":replyIds";
-        setAs(key, replyMap, COMMENT_TTL); // 직렬화로 저장
-    }
-
-
-    // ✅ 유저 좋아요/싫어요 캐시 저장
+    // 유저 좋아요/싫어요 캐시 저장
     public void cacheUserReaction(Long postId, Long userId, boolean liked, boolean disliked) {
         String likeKey = POST_REACTION_KEY_PREFIX + postId + ":likedUserIds";
         String dislikeKey = POST_REACTION_KEY_PREFIX + postId + ":dislikedUserIds";
