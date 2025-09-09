@@ -89,11 +89,17 @@ public class CommentController {
         return ResponseEntity.ok(count);
     }
 
-    // CommentID들로 검색(이미 redis에 id있음)
+    // CommentID들로 검색 후 프론트(이미 redis에 id있음)
     @PostMapping("/byIds")
     public ResponseEntity<CommentListResponseDTO> getCommentsByIds(@RequestBody List<Long> ids) {
         List<CommentResponseDTO> comments = commentService.getCommentsByIds(ids);
         return ResponseEntity.ok(new CommentListResponseDTO(comments));
+    }
+
+    /** 캐시 댓글만 조회 */
+    @GetMapping("/cached")
+    public List<CommentResponseDTO> getCachedRootComments(@RequestParam Long postId) {
+        return commentService.getCachedRootComments(postId);
     }
 
 

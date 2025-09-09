@@ -204,7 +204,7 @@ public class RedisCacheService {
         }
     }
 
-    // 댓글 추가
+    // 새 댓글 추가 (
     public void appendRootComment(Long postId, CommentResponseDTO dto) {
         String key = "post:" + postId + ":comments";
         try {

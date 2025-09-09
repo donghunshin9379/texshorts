@@ -86,4 +86,8 @@ public class CommentService {
                 .collect(Collectors.toList());
     }
 
+    public List<CommentResponseDTO> getCachedRootComments(Long postId) {
+        return redisCacheService.getRootCommentList(postId);
+    }
+
 }
